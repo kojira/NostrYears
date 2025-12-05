@@ -12,6 +12,7 @@ import {
   Chip,
   Skeleton,
   LinearProgress,
+  Link,
 } from '@mui/material';
 import { nip19 } from 'nostr-tools';
 import type { FriendScore, NostrProfile } from '../types/nostr';
@@ -52,6 +53,15 @@ export function FriendsRanking({ friends, relays }: FriendsRankingProps) {
       return `${npub.slice(0, 12)}...${npub.slice(-8)}`;
     } catch {
       return `${pubkey.slice(0, 8)}...`;
+    }
+  };
+
+  const getProfileLink = (pubkey: string): string => {
+    try {
+      const npub = nip19.npubEncode(pubkey);
+      return `https://njump.me/${npub}`;
+    } catch {
+      return `https://njump.me/${pubkey}`;
     }
   };
 
@@ -127,16 +137,27 @@ export function FriendsRanking({ friends, relays }: FriendsRankingProps) {
                   {loading ? (
                     <Skeleton variant="circular" width={40} height={40} />
                   ) : (
-                    <Avatar
-                      src={profiles.get(friend.pubkey)?.picture}
-                      sx={{
-                        bgcolor: 'primary.main',
-                        border: '2px solid',
-                        borderColor: index < 3 ? 'secondary.main' : 'transparent',
-                      }}
+                    <Link
+                      href={getProfileLink(friend.pubkey)}
+                      target="_blank"
+                      rel="noopener noreferrer"
                     >
-                      {getDisplayName(friend.pubkey).charAt(0).toUpperCase()}
-                    </Avatar>
+                      <Avatar
+                        src={profiles.get(friend.pubkey)?.picture}
+                        sx={{
+                          bgcolor: 'primary.main',
+                          border: '2px solid',
+                          borderColor: index < 3 ? 'secondary.main' : 'transparent',
+                          cursor: 'pointer',
+                          transition: 'transform 0.2s',
+                          '&:hover': {
+                            transform: 'scale(1.1)',
+                          },
+                        }}
+                      >
+                        {getDisplayName(friend.pubkey).charAt(0).toUpperCase()}
+                      </Avatar>
+                    </Link>
                   )}
                 </ListItemAvatar>
                 
@@ -145,9 +166,23 @@ export function FriendsRanking({ friends, relays }: FriendsRankingProps) {
                     loading ? (
                       <Skeleton width={120} />
                     ) : (
-                      <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                        {getDisplayName(friend.pubkey)}
-                      </Typography>
+                      <Link
+                        href={getProfileLink(friend.pubkey)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        sx={{
+                          color: 'text.primary',
+                          textDecoration: 'none',
+                          '&:hover': {
+                            color: 'secondary.main',
+                            textDecoration: 'underline',
+                          },
+                        }}
+                      >
+                        <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                          {getDisplayName(friend.pubkey)}
+                        </Typography>
+                      </Link>
                     )
                   }
                   secondary={
