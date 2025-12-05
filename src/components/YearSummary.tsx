@@ -8,7 +8,6 @@ import {
   Snackbar,
   Avatar,
   Chip,
-  Paper,
 } from '@mui/material';
 import { nip19 } from 'nostr-tools';
 import { StatsCard } from './StatsCard';
@@ -106,7 +105,34 @@ export function YearSummary({ stats, onReset }: YearSummaryProps) {
   };
 
   return (
-    <Box sx={{ p: 4, maxWidth: 1200, mx: 'auto' }}>
+    <Box sx={{ p: 4, maxWidth: 1200, mx: 'auto', position: 'relative' }}>
+      {/* Top right controls */}
+      <Box
+        sx={{
+          position: 'absolute',
+          top: 16,
+          right: 16,
+          display: 'flex',
+          gap: 1,
+          alignItems: 'center',
+        }}
+      >
+        <Button
+          variant="text"
+          size="small"
+          onClick={onReset}
+          sx={{
+            color: 'text.secondary',
+            fontSize: '0.75rem',
+            '&:hover': {
+              backgroundColor: 'rgba(255,255,255,0.1)',
+            },
+          }}
+        >
+          ← 別のユーザー
+        </Button>
+      </Box>
+
       <Box sx={{ textAlign: 'center', mb: 4 }}>
         <Typography variant="h1" sx={{ mb: 3 }}>
           NostrYears 2025
@@ -118,8 +144,8 @@ export function YearSummary({ stats, onReset }: YearSummaryProps) {
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
-            gap: 2,
-            mb: 3,
+            gap: 1,
+            mb: 4,
           }}
         >
           <Avatar
@@ -134,77 +160,38 @@ export function YearSummary({ stats, onReset }: YearSummaryProps) {
           >
             {getDisplayName().charAt(0).toUpperCase()}
           </Avatar>
-          <Typography variant="h5" sx={{ fontWeight: 600 }}>
+          <Typography variant="h5" sx={{ fontWeight: 600, mt: 1 }}>
             {getDisplayName()}
           </Typography>
           <Typography variant="body2" sx={{ color: 'text.secondary' }}>
             の2025年のNostr活動まとめ
           </Typography>
-        </Box>
-        
-        {/* Relay Info */}
-        <Paper
-          sx={{
-            display: 'inline-block',
-            p: 1.5,
-            px: 2,
-            mb: 3,
-            backgroundColor: 'rgba(255,255,255,0.05)',
-            borderRadius: 2,
-          }}
-        >
-          <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mb: 1 }}>
-            使用リレー:
-          </Typography>
-          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', justifyContent: 'center' }}>
-            {stats.relays.map((relay) => (
-              <Chip
-                key={relay}
-                label={relay.replace('wss://', '')}
-                size="small"
-                sx={{ backgroundColor: 'rgba(156, 39, 176, 0.2)' }}
-              />
-            ))}
-          </Box>
-          {percentileCount > 0 && (
-            <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mt: 1 }}>
-              同じリレーで集計した {percentileCount} 人のユーザーと比較
-            </Typography>
-          )}
-        </Paper>
-        
-        <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2, flexWrap: 'wrap' }}>
-          <Button
-            variant="outlined"
-            onClick={onReset}
-            sx={{
-              borderColor: 'rgba(255,255,255,0.3)',
-              color: 'text.secondary',
-            }}
-          >
-            別のユーザーを検索
-          </Button>
           
+          {/* Publish button */}
           {hasNip07() && !published && (
             <Button
               variant="contained"
+              size="small"
               onClick={handlePublish}
               disabled={publishing}
               sx={{
+                mt: 2,
                 background: 'linear-gradient(45deg, #9c27b0, #ff4081)',
                 '&:hover': {
                   background: 'linear-gradient(45deg, #7b1fa2, #c60055)',
                 },
               }}
             >
-              {publishing ? '投稿中...' : '結果をリレーに投稿'}
+              {publishing ? '投稿中...' : '📤 結果をリレーに投稿'}
             </Button>
           )}
           
           {published && (
-            <Alert severity="success" sx={{ py: 0.5 }}>
-              投稿済み
-            </Alert>
+            <Chip
+              label="✓ 投稿済み"
+              size="small"
+              sx={{ mt: 2, backgroundColor: 'rgba(76, 175, 80, 0.2)', color: '#4caf50' }}
+            />
           )}
         </Box>
       </Box>
@@ -312,6 +299,41 @@ export function YearSummary({ stats, onReset }: YearSummaryProps) {
           </Grid>
         )}
       </Grid>
+
+      {/* Footer with relay info */}
+      <Box
+        sx={{
+          mt: 6,
+          pt: 3,
+          borderTop: '1px solid rgba(255,255,255,0.1)',
+          textAlign: 'center',
+        }}
+      >
+        <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mb: 1 }}>
+          使用リレー
+        </Typography>
+        <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', justifyContent: 'center', mb: 1 }}>
+          {stats.relays.map((relay) => (
+            <Chip
+              key={relay}
+              label={relay.replace('wss://', '')}
+              size="small"
+              variant="outlined"
+              sx={{ 
+                fontSize: '0.7rem',
+                height: 24,
+                borderColor: 'rgba(255,255,255,0.2)',
+                color: 'text.secondary',
+              }}
+            />
+          ))}
+        </Box>
+        {percentileCount > 0 && (
+          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+            {percentileCount} 人のユーザーと比較
+          </Typography>
+        )}
+      </Box>
 
       <Snackbar
         open={snackbar.open}
