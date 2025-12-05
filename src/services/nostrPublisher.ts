@@ -79,6 +79,10 @@ export async function publishNostrYearsStats(
   const content = createEventContent(stats);
   const dTag = generateDTag(NOSTR_YEARS_VERSION, stats.period.since, stats.period.until, stats.relays);
   
+  console.log('Publishing with d-tag:', dTag);
+  console.log('Period:', stats.period.since, '-', stats.period.until);
+  console.log('Relays:', stats.relays);
+  
   // Kind 30078 event (stats data)
   const statsEvent: UnsignedEvent = {
     kind: NOSTR_YEARS_KIND,
