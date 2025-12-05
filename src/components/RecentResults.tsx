@@ -72,12 +72,13 @@ export function RecentResults({ relays, onLoadCachedResult }: RecentResultsProps
 
   const formatDate = (timestamp: number): string => {
     const date = new Date(timestamp * 1000);
-    return date.toLocaleDateString('en-US', { 
+    return date.toLocaleDateString('en-GB', { 
       year: 'numeric',
       month: 'short', 
       day: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
+      hour12: false,
     });
   };
 
