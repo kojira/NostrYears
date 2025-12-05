@@ -36,6 +36,17 @@ export interface TopReactionEmoji {
   count: number;
 }
 
+// Monthly activity data
+export interface MonthlyActivity {
+  month: string; // "YYYY-MM" format
+  kind1: number;
+  kind6: number;
+  kind7: number;
+  kind42: number;
+  kind30023: number;
+  receivedReactions: number; // Reactions received on my posts
+}
+
 // NostrYears statistics
 export interface NostrYearsStats {
   pubkey: string;
@@ -51,11 +62,13 @@ export interface NostrYearsStats {
   kind30023Chars: number;
   kind6Count: number;
   kind7Count: number;
+  receivedReactionsCount: number;
   kind42Count: number;
   imageCount: number;
   topPosts: TopPostInfo[]; // Top 3 posts by reaction count
   topReactionEmojis: TopReactionEmoji[]; // Top 3 reaction emojis used
   friendsRanking: FriendScore[];
+  monthlyActivity: MonthlyActivity[]; // Monthly activity breakdown
 }
 
 export interface FriendScore {
@@ -68,7 +81,7 @@ export interface FriendScore {
 }
 
 // App version for cache invalidation
-export const NOSTR_YEARS_VERSION = 1;
+export const NOSTR_YEARS_VERSION = 2;
 
 // kind 30078 event content structure
 export interface NostrYearsEventContent {
@@ -84,10 +97,12 @@ export interface NostrYearsEventContent {
   kind30023Chars: number;
   kind6Count: number;
   kind7Count: number;
+  receivedReactionsCount: number;
   kind42Count: number;
   imageCount: number;
   topPosts: TopPostInfo[];
   topReactionEmojis: TopReactionEmoji[];
+  monthlyActivity: MonthlyActivity[];
 }
 
 // Percentile data

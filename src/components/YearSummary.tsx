@@ -19,6 +19,7 @@ import { nip19 } from 'nostr-tools';
 import { StatsCard } from './StatsCard';
 import { FriendsRanking } from './FriendsRanking';
 import { TopPosts } from './TopPosts';
+import { MonthlyActivityChart } from './MonthlyActivityChart';
 import type { NostrYearsStats, PercentileData } from '../types/nostr';
 import { hasNip07, publishNostrYearsStats, fetchAllNostrYearsEvents, createEventContent } from '../services/nostrPublisher';
 import { calculateAllPercentiles } from '../utils/percentile';
@@ -130,7 +131,8 @@ export function YearSummary({ stats, onReset, isFromCache, onRefresh }: YearSumm
       `🖼️ Images: ${stats.imageCount.toLocaleString()}`,
       `📄 Long-form articles: ${stats.kind30023Count.toLocaleString()}`,
       `🔄 Reposts: ${stats.kind6Count.toLocaleString()}`,
-      `❤️ Reactions: ${stats.kind7Count.toLocaleString()}`,
+      `❤️ Reactions sent: ${stats.kind7Count.toLocaleString()}`,
+      `💕 Reactions received: ${stats.receivedReactionsCount.toLocaleString()}`,
       `💬 Chat messages: ${stats.kind42Count.toLocaleString()}`,
     ];
 
@@ -344,12 +346,22 @@ export function YearSummary({ stats, onReset, isFromCache, onRefresh }: YearSumm
         
         <Grid size={{ xs: 12, sm: 6, md: 4 }}>
           <StatsCard
-            title="Reactions (kind 7)"
+            title="Reactions Sent"
             value={stats.kind7Count}
             unit=""
             percentile={percentiles?.kind7Count}
             icon="❤️"
             color="#e91e63"
+          />
+        </Grid>
+        
+        <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+          <StatsCard
+            title="Reactions Received"
+            value={stats.receivedReactionsCount}
+            unit=""
+            icon="💕"
+            color="#ff4081"
           />
         </Grid>
         
@@ -417,6 +429,13 @@ export function YearSummary({ stats, onReset, isFromCache, onRefresh }: YearSumm
                 </Box>
               </CardContent>
             </Card>
+          </Grid>
+        )}
+
+        {/* Monthly Activity Chart */}
+        {stats.monthlyActivity && stats.monthlyActivity.length > 0 && (
+          <Grid size={{ xs: 12 }}>
+            <MonthlyActivityChart data={stats.monthlyActivity} />
           </Grid>
         )}
 

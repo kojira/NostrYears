@@ -64,11 +64,13 @@ export function useNostrStats(): UseNostrStatsReturn {
           kind30023Chars: existingStats.kind30023Chars,
           kind6Count: existingStats.kind6Count,
           kind7Count: existingStats.kind7Count,
+          receivedReactionsCount: existingStats.receivedReactionsCount || 0,
           kind42Count: existingStats.kind42Count,
           imageCount: existingStats.imageCount,
           topPosts: existingStats.topPosts || [],
           topReactionEmojis: existingStats.topReactionEmojis || [],
           friendsRanking: [], // Not stored in published event
+          monthlyActivity: existingStats.monthlyActivity || [],
         };
         
         setProgress({ phase: 'done', message: 'Using cached results', progress: 100 });

@@ -41,10 +41,12 @@ export function createEventContent(stats: NostrYearsStats): NostrYearsEventConte
     kind30023Chars: stats.kind30023Chars,
     kind6Count: stats.kind6Count,
     kind7Count: stats.kind7Count,
+    receivedReactionsCount: stats.receivedReactionsCount,
     kind42Count: stats.kind42Count,
     imageCount: stats.imageCount,
     topPosts: stats.topPosts,
     topReactionEmojis: stats.topReactionEmojis,
+    monthlyActivity: stats.monthlyActivity,
   };
 }
 

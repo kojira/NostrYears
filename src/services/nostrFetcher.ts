@@ -4,6 +4,14 @@ import type { NostrYearsStats, FetchProgress, NostrProfile, TopPostInfo, TopReac
 import { countCharsWithoutUrls, countImages, extractPubkeysFromTags, isReply } from '../utils/textAnalysis';
 import { calculateFriendScores, addToCountMap } from '../utils/scoring';
 
+// Helper to get month key from timestamp
+function getMonthKey(timestamp: number): string {
+  const date = new Date(timestamp * 1000);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  return `${year}-${month}`;
+}
+
 // Default relays
 export const DEFAULT_RELAYS = ['wss://r.kojira.io', 'wss://yabu.me'];
 
@@ -68,15 +76,117 @@ export async function fetchNostrYearsStats(
 ): Promise<NostrYearsStats> {
   const f = initFetcher();
   
-  // Fetch user profile first
+  // Map to count reaction emojis
+  const reactionEmojiCounts = new Map<string, number>();
+
+  // Maps for friend scoring
+  const outgoingReactions = new Map<string, number>();
+  const outgoingReplies = new Map<string, number>();
+  const incomingReactions = new Map<string, number>();
+  const incomingReplies = new Map<string, number>();
+  
+  // Store own kind 1 event IDs for top posts calculation
+  const ownKind1Ids = new Set<string>();
+  const kind1ReactionCounts = new Map<string, number>();
+
+  // Fetch data - use iterator to show progress based on date
+  const periodDuration = periodUntil - periodSince;
+
+  // Helper to iterate events with progress
+  async function fetchWithProgress(
+    filter: { kinds: number[]; authors?: string[]; '#p'?: string[] },
+    phaseLabel: string,
+    progressStart: number,
+    progressEnd: number
+  ): Promise<NostrEvent[]> {
+    const events: NostrEvent[] = [];
+    let lastProgressUpdate = progressStart;
+
+    const iterator = f.allEventsIterator(
+      relays,
+      filter,
+      { since: periodSince, until: periodUntil }
+    );
+
+    for await (const event of iterator) {
+      events.push(event);
+      
+      // Update progress based on event's created_at (events come in reverse chronological order)
+      const eventProgress = (periodUntil - event.created_at) / periodDuration;
+      const progress = progressStart + eventProgress * (progressEnd - progressStart);
+      
+      // Throttle updates to avoid too frequent UI updates
+      if (progress - lastProgressUpdate >= 2) {
+        const percent = Math.round(eventProgress * 100);
+        onProgress?.({
+          phase: 'fetching_own',
+          message: `${phaseLabel} (${percent}%)`,
+          progress: Math.min(progress, progressEnd),
+        });
+        lastProgressUpdate = progress;
+      }
+    }
+
+    return events;
+  }
+
+  // Start profile fetch in background
+  const profilePromise = fetchProfile(pubkey, relays);
+
+  // Phase 1: Fetch own events (5% - 40%)
   onProgress?.({
     phase: 'fetching_own',
-    message: 'Fetching profile...',
+    message: 'Fetching posts...',
     progress: 5,
   });
-  
-  const profile = await fetchProfile(pubkey, relays);
-  
+
+  const ownEvents = await fetchWithProgress(
+    { kinds: [1, 6, 7, 42, 30023], authors: [pubkey] },
+    'Fetching posts...',
+    5,
+    40
+  );
+
+  // Phase 2: Fetch reactions to my posts (40% - 60%)
+  onProgress?.({
+    phase: 'fetching_reactions',
+    message: 'Fetching reactions...',
+    progress: 40,
+  });
+
+  const incomingReactionsEvents = await fetchWithProgress(
+    { kinds: [7], '#p': [pubkey] },
+    'Fetching reactions...',
+    40,
+    60
+  );
+
+  // Phase 3: Fetch replies mentioning me (60% - 80%)
+  onProgress?.({
+    phase: 'fetching_mentions',
+    message: 'Fetching replies...',
+    progress: 60,
+  });
+
+  const mentionEvents = await fetchWithProgress(
+    { kinds: [1], '#p': [pubkey] },
+    'Fetching replies...',
+    60,
+    80
+  );
+
+  // Wait for profile
+  const profile = await profilePromise;
+
+  onProgress?.({
+    phase: 'calculating',
+    message: 'Processing data...',
+    progress: 65,
+  });
+
+  // Monthly activity tracking
+  const monthlyMap = new Map<string, { kind1: number; kind6: number; kind7: number; kind42: number; kind30023: number; receivedReactions: number }>();
+
   const stats: NostrYearsStats = {
     pubkey,
     profile,
@@ -88,48 +198,33 @@ export async function fetchNostrYearsStats(
     kind30023Chars: 0,
     kind6Count: 0,
     kind7Count: 0,
+    receivedReactionsCount: 0,
     kind42Count: 0,
     imageCount: 0,
     topPosts: [],
     topReactionEmojis: [],
     friendsRanking: [],
+    monthlyActivity: [],
   };
 
-  // Map to count reaction emojis
-  const reactionEmojiCounts = new Map<string, number>();
+  // Helper to increment monthly count
+  const addToMonthly = (timestamp: number, kind: 'kind1' | 'kind6' | 'kind7' | 'kind42' | 'kind30023' | 'receivedReactions') => {
+    const monthKey = getMonthKey(timestamp);
+    if (!monthlyMap.has(monthKey)) {
+      monthlyMap.set(monthKey, { kind1: 0, kind6: 0, kind7: 0, kind42: 0, kind30023: 0, receivedReactions: 0 });
+    }
+    monthlyMap.get(monthKey)![kind]++;
+  };
 
-  // Maps for friend scoring
-  const outgoingReactions = new Map<string, number>();
-  const outgoingReplies = new Map<string, number>();
-  const incomingReactions = new Map<string, number>();
-  const incomingReplies = new Map<string, number>();
-  
-  // Store own kind 1 event IDs for later reaction lookup
-  const ownKind1Ids: string[] = [];
-  const kind1ReactionCounts = new Map<string, number>();
-
-  // Phase 1: Fetch own events
-  onProgress?.({
-    phase: 'fetching_own',
-    message: 'Fetching your posts...',
-    progress: 10,
-  });
-
-  // Fetch own events (kind 1, 6, 7, 42, 30023)
-  const ownEvents = await f.fetchAllEvents(
-    relays,
-    { kinds: [1, 6, 7, 42, 30023], authors: [pubkey] },
-    { since: periodSince, until: periodUntil },
-    { sort: true }
-  );
-
+  // Process own events
   for (const event of ownEvents) {
     switch (event.kind) {
       case 1:
         stats.kind1Count++;
         stats.kind1Chars += countCharsWithoutUrls(event.content);
         stats.imageCount += countImages(event.content);
-        ownKind1Ids.push(event.id);
+        ownKind1Ids.add(event.id);
+        addToMonthly(event.created_at, 'kind1');
         
         // Track outgoing replies
         if (isReply(event.tags)) {
@@ -144,10 +239,12 @@ export async function fetchNostrYearsStats(
         
       case 6:
         stats.kind6Count++;
+        addToMonthly(event.created_at, 'kind6');
         break;
         
       case 7:
         stats.kind7Count++;
+        addToMonthly(event.created_at, 'kind7');
         // Track outgoing reactions
         const reactionTargets = extractPubkeysFromTags(event.tags);
         for (const targetPubkey of reactionTargets) {
@@ -162,52 +259,48 @@ export async function fetchNostrYearsStats(
         
       case 42:
         stats.kind42Count++;
+        addToMonthly(event.created_at, 'kind42');
         break;
         
       case 30023:
         stats.kind30023Count++;
         stats.kind30023Chars += countCharsWithoutUrls(event.content);
+        addToMonthly(event.created_at, 'kind30023');
         break;
     }
   }
 
-  onProgress?.({
-    phase: 'fetching_reactions',
-    message: 'Fetching reactions to your posts...',
-    progress: 40,
-  });
-
-  // Phase 2: Fetch reactions to own posts (in batches)
-  const batchSize = 50;
-  for (let i = 0; i < ownKind1Ids.length; i += batchSize) {
-    const batch = ownKind1Ids.slice(i, i + batchSize);
+  // Process incoming reactions (reactions to my posts)
+  for (const reaction of incomingReactionsEvents) {
+    if (reaction.pubkey === pubkey) continue; // Skip self-reactions
     
-    const reactions = await f.fetchAllEvents(
-      relays,
-      { kinds: [7], '#e': batch },
-      { since: periodSince, until: periodUntil }
-    );
-
-    for (const reaction of reactions) {
-      // Find which of my posts this reaction is for
-      const eTag = reaction.tags.find(t => t[0] === 'e' && batch.includes(t[1]));
-      if (eTag) {
-        const postId = eTag[1];
+    // Find which of my posts this reaction is for
+    const eTag = reaction.tags.find(t => t[0] === 'e');
+    if (eTag) {
+      const postId = eTag[1];
+      // Only count if it's a reaction to my kind 1 post
+      if (ownKind1Ids.has(postId)) {
         kind1ReactionCounts.set(postId, (kind1ReactionCounts.get(postId) || 0) + 1);
-        
-        // Track incoming reactions
-        if (reaction.pubkey !== pubkey) {
-          addToCountMap(incomingReactions, reaction.pubkey);
-        }
       }
+      addToCountMap(incomingReactions, reaction.pubkey);
+      // Track received reactions
+      stats.receivedReactionsCount++;
+      addToMonthly(reaction.created_at, 'receivedReactions');
     }
-
-    onProgress?.({
-      phase: 'fetching_reactions',
-      message: `Fetching reactions... (${Math.min(i + batchSize, ownKind1Ids.length)}/${ownKind1Ids.length})`,
-      progress: 40 + (i / ownKind1Ids.length) * 20,
-    });
   }
+
+  // Process replies
+  for (const event of mentionEvents) {
+    if (event.pubkey !== pubkey && isReply(event.tags)) {
+      addToCountMap(incomingReplies, event.pubkey);
+    }
+  }
+
+  onProgress?.({
+    phase: 'calculating',
+    message: 'Calculating statistics...',
+    progress: 80,
+  });
 
   // Find top 3 posts by reaction count
   const sortedPosts: TopPostInfo[] = Array.from(kind1ReactionCounts.entries())
@@ -225,24 +318,18 @@ export async function fetchNostrYearsStats(
   
   stats.topReactionEmojis = sortedEmojis;
 
-  onProgress?.({
-    phase: 'fetching_mentions',
-    message: 'Fetching replies to you...',
-    progress: 70,
-  });
-
-  // Phase 3: Fetch replies mentioning me (kind 1 with #p tag)
-  const mentionEvents = await f.fetchAllEvents(
-    relays,
-    { kinds: [1], '#p': [pubkey] },
-    { since: periodSince, until: periodUntil }
-  );
-
-  for (const event of mentionEvents) {
-    if (event.pubkey !== pubkey && isReply(event.tags)) {
-      addToCountMap(incomingReplies, event.pubkey);
-    }
-  }
+  // Convert monthly map to sorted array
+  stats.monthlyActivity = Array.from(monthlyMap.entries())
+    .map(([month, counts]) => ({
+      month,
+      kind1: counts.kind1,
+      kind6: counts.kind6,
+      kind7: counts.kind7,
+      kind42: counts.kind42,
+      kind30023: counts.kind30023,
+      receivedReactions: counts.receivedReactions,
+    }))
+    .sort((a, b) => a.month.localeCompare(b.month));
 
   onProgress?.({
     phase: 'calculating',
