@@ -49,6 +49,12 @@ export interface MonthlyActivity {
   zapsReceived: number;
 }
 
+// Hourly activity data (24-hour distribution)
+export interface HourlyActivity {
+  hour: number; // 0-23
+  count: number;
+}
+
 // Zap statistics
 export interface ZapStats {
   count: number;
@@ -78,6 +84,7 @@ export interface NostrYearsStats {
   topReactionEmojis: TopReactionEmoji[]; // Top 3 reaction emojis used
   friendsRanking: FriendScore[];
   monthlyActivity: MonthlyActivity[]; // Monthly activity breakdown
+  hourlyActivity: HourlyActivity[]; // 24-hour activity distribution
   zapsReceived: ZapStats;
   zapsSent: ZapStats;
 }
@@ -92,7 +99,7 @@ export interface FriendScore {
 }
 
 // App version for cache invalidation
-export const NOSTR_YEARS_VERSION = 3;
+export const NOSTR_YEARS_VERSION = 2;
 
 // kind 30078 event content structure
 export interface NostrYearsEventContent {
@@ -114,6 +121,7 @@ export interface NostrYearsEventContent {
   topPosts: TopPostInfo[];
   topReactionEmojis: TopReactionEmoji[];
   monthlyActivity: MonthlyActivity[];
+  hourlyActivity: HourlyActivity[];
   zapsReceived: ZapStats;
   zapsSent: ZapStats;
 }

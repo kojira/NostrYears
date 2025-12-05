@@ -47,6 +47,7 @@ export function createEventContent(stats: NostrYearsStats): NostrYearsEventConte
     topPosts: stats.topPosts,
     topReactionEmojis: stats.topReactionEmojis,
     monthlyActivity: stats.monthlyActivity,
+    hourlyActivity: stats.hourlyActivity,
     zapsReceived: stats.zapsReceived,
     zapsSent: stats.zapsSent,
   };

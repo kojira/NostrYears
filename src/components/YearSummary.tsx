@@ -20,6 +20,7 @@ import { StatsCard } from './StatsCard';
 import { FriendsRanking } from './FriendsRanking';
 import { TopPosts } from './TopPosts';
 import { MonthlyActivityChart } from './MonthlyActivityChart';
+import { HourlyActivityChart } from './HourlyActivityChart';
 import type { NostrYearsStats, PercentileData } from '../types/nostr';
 import { hasNip07, publishNostrYearsStats, fetchAllNostrYearsEvents, createEventContent } from '../services/nostrPublisher';
 import { calculateAllPercentiles } from '../utils/percentile';
@@ -499,6 +500,13 @@ export function YearSummary({ stats, onReset, isFromCache, onRefresh }: YearSumm
         {stats.monthlyActivity && stats.monthlyActivity.length > 0 && (
           <Grid size={{ xs: 12 }}>
             <MonthlyActivityChart data={stats.monthlyActivity} />
+          </Grid>
+        )}
+
+        {/* Hourly Activity Chart */}
+        {stats.hourlyActivity && stats.hourlyActivity.length > 0 && (
+          <Grid size={{ xs: 12, md: 6 }}>
+            <HourlyActivityChart data={stats.hourlyActivity} />
           </Grid>
         )}
 

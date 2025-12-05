@@ -29,6 +29,14 @@ function getMonthKey(timestamp: number): string {
   return `${year}-${month}`;
 }
 
+// Helper to get hour from timestamp (JST timezone)
+function getHourJST(timestamp: number): number {
+  const date = new Date(timestamp * 1000);
+  // Convert to JST (UTC + 9 hours)
+  const jstHours = (date.getUTCHours() + 9) % 24;
+  return jstHours;
+}
+
 // Default relays
 export const DEFAULT_RELAYS = ['wss://r.kojira.io', 'wss://yabu.me'];
 
@@ -210,6 +218,12 @@ export async function fetchNostrYearsStats(
   // Monthly activity tracking
   const monthlyMap = new Map<string, { kind1: number; kind6: number; kind7: number; kind42: number; kind30023: number; receivedReactions: number; zapsSent: number; zapsReceived: number }>();
 
+  // Hourly activity tracking (24 hours, JST)
+  const hourlyMap = new Map<number, number>();
+  for (let h = 0; h < 24; h++) {
+    hourlyMap.set(h, 0);
+  }
+
   const stats: NostrYearsStats = {
     pubkey,
     profile,
@@ -228,6 +242,7 @@ export async function fetchNostrYearsStats(
     topReactionEmojis: [],
     friendsRanking: [],
     monthlyActivity: [],
+    hourlyActivity: [],
     zapsReceived: { count: 0, totalSats: 0, averageSats: 0 },
     zapsSent: { count: 0, totalSats: 0, averageSats: 0 },
   };
@@ -241,6 +256,12 @@ export async function fetchNostrYearsStats(
     monthlyMap.get(monthKey)![kind]++;
   };
 
+  // Helper to increment hourly count (JST timezone)
+  const addToHourly = (timestamp: number) => {
+    const hour = getHourJST(timestamp);
+    hourlyMap.set(hour, (hourlyMap.get(hour) || 0) + 1);
+  };
+
   // Process own events
   for (const event of ownEvents) {
     switch (event.kind) {
@@ -250,6 +271,7 @@ export async function fetchNostrYearsStats(
         stats.imageCount += countImages(event.content);
         ownKind1Ids.add(event.id);
         addToMonthly(event.created_at, 'kind1');
+        addToHourly(event.created_at);
         
         // Track outgoing replies
         if (isReply(event.tags)) {
@@ -265,11 +287,13 @@ export async function fetchNostrYearsStats(
       case 6:
         stats.kind6Count++;
         addToMonthly(event.created_at, 'kind6');
+        addToHourly(event.created_at);
         break;
         
       case 7:
         stats.kind7Count++;
         addToMonthly(event.created_at, 'kind7');
+        addToHourly(event.created_at);
         // Track outgoing reactions
         const reactionTargets = extractPubkeysFromTags(event.tags);
         for (const targetPubkey of reactionTargets) {
@@ -285,12 +309,14 @@ export async function fetchNostrYearsStats(
       case 42:
         stats.kind42Count++;
         addToMonthly(event.created_at, 'kind42');
+        addToHourly(event.created_at);
         break;
         
       case 30023:
         stats.kind30023Count++;
         stats.kind30023Chars += countCharsWithoutUrls(event.content);
         addToMonthly(event.created_at, 'kind30023');
+        addToHourly(event.created_at);
         break;
         
     }
@@ -396,6 +422,11 @@ export async function fetchNostrYearsStats(
       zapsReceived: counts.zapsReceived,
     }))
     .sort((a, b) => a.month.localeCompare(b.month));
+
+  // Convert hourly map to sorted array (0-23 hours in JST)
+  stats.hourlyActivity = Array.from(hourlyMap.entries())
+    .map(([hour, count]) => ({ hour, count }))
+    .sort((a, b) => a.hour - b.hour);
 
   onProgress?.({
     phase: 'calculating',

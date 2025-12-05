@@ -72,6 +72,7 @@ export function useNostrStats(): UseNostrStatsReturn {
           topReactionEmojis: existingStats.topReactionEmojis || [],
           friendsRanking: [], // Not stored in published event
           monthlyActivity: existingStats.monthlyActivity || [],
+          hourlyActivity: existingStats.hourlyActivity || [],
           zapsReceived: existingStats.zapsReceived || { count: 0, totalSats: 0, averageSats: 0 },
           zapsSent: existingStats.zapsSent || { count: 0, totalSats: 0, averageSats: 0 },
         };
@@ -117,6 +118,7 @@ export function useNostrStats(): UseNostrStatsReturn {
       topReactionEmojis: content.topReactionEmojis || [],
       friendsRanking: [], // Not stored in published event
       monthlyActivity: content.monthlyActivity || [],
+      hourlyActivity: content.hourlyActivity || [],
       zapsReceived: content.zapsReceived || { count: 0, totalSats: 0, averageSats: 0 },
       zapsSent: content.zapsSent || { count: 0, totalSats: 0, averageSats: 0 },
     };
