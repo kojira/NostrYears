@@ -45,6 +45,8 @@ export interface MonthlyActivity {
   kind42: number;
   kind30023: number;
   receivedReactions: number; // Reactions received on my posts
+  zapsSent: number;
+  zapsReceived: number;
 }
 
 // Zap statistics

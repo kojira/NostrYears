@@ -157,27 +157,46 @@ export async function fetchNostrYearsStats(
     progress: 5,
   });
 
-  // Phase 1: Fetch own events (5% - 50%)
+  // Phase 1: Fetch own events (5% - 40%)
   const ownEvents = await fetchWithProgress(
-    { kinds: [1, 6, 7, 42, 30023, 9734], authors: [pubkey] },
+    { kinds: [1, 6, 7, 42, 30023], authors: [pubkey] },
     'Fetching posts...',
     5,
-    50
+    40
   );
 
-  // Phase 2: Fetch incoming events (reactions, replies, zaps) (50% - 80%)
+  // Phase 2: Fetch incoming events (reactions, replies, received zaps) (40% - 70%)
   onProgress?.({
     phase: 'fetching_reactions',
-    message: 'Fetching incoming events...',
-    progress: 50,
+    message: 'Fetching reactions, replies, zaps...',
+    progress: 40,
   });
 
   const incomingEvents = await fetchWithProgress(
     { kinds: [1, 7, 9735], '#p': [pubkey] },
-    'Fetching reactions, replies, zaps...',
-    50,
-    80
+    'Fetching reactions, replies, received zaps...',
+    40,
+    70
   );
+
+  // Phase 3: Fetch sent zaps (70% - 80%)
+  // Use #P tag (uppercase) for zap sender - need to use raw filter
+  onProgress?.({
+    phase: 'fetching_reactions',
+    message: 'Fetching sent zaps...',
+    progress: 70,
+  });
+
+  let sentZaps: NostrEvent[] = [];
+  try {
+    sentZaps = await f.fetchAllEvents(
+      relays,
+      { kinds: [9735], '#P': [pubkey] } as Parameters<typeof f.fetchAllEvents>[1],
+      { since: periodSince, until: periodUntil }
+    );
+  } catch (error) {
+    console.error('Error fetching sent zaps:', error);
+  }
 
   // Wait for profile
   const profile = await profilePromise;
@@ -189,7 +208,7 @@ export async function fetchNostrYearsStats(
   });
 
   // Monthly activity tracking
-  const monthlyMap = new Map<string, { kind1: number; kind6: number; kind7: number; kind42: number; kind30023: number; receivedReactions: number }>();
+  const monthlyMap = new Map<string, { kind1: number; kind6: number; kind7: number; kind42: number; kind30023: number; receivedReactions: number; zapsSent: number; zapsReceived: number }>();
 
   const stats: NostrYearsStats = {
     pubkey,
@@ -214,10 +233,10 @@ export async function fetchNostrYearsStats(
   };
 
   // Helper to increment monthly count
-  const addToMonthly = (timestamp: number, kind: 'kind1' | 'kind6' | 'kind7' | 'kind42' | 'kind30023' | 'receivedReactions') => {
+  const addToMonthly = (timestamp: number, kind: 'kind1' | 'kind6' | 'kind7' | 'kind42' | 'kind30023' | 'receivedReactions' | 'zapsSent' | 'zapsReceived') => {
     const monthKey = getMonthKey(timestamp);
     if (!monthlyMap.has(monthKey)) {
-      monthlyMap.set(monthKey, { kind1: 0, kind6: 0, kind7: 0, kind42: 0, kind30023: 0, receivedReactions: 0 });
+      monthlyMap.set(monthKey, { kind1: 0, kind6: 0, kind7: 0, kind42: 0, kind30023: 0, receivedReactions: 0, zapsSent: 0, zapsReceived: 0 });
     }
     monthlyMap.get(monthKey)![kind]++;
   };
@@ -274,24 +293,8 @@ export async function fetchNostrYearsStats(
         addToMonthly(event.created_at, 'kind30023');
         break;
         
-      case 9734:
-        // Zap request - track sent zaps
-        const amountTag = event.tags.find(t => t[0] === 'amount');
-        if (amountTag && amountTag[1]) {
-          const sats = Math.floor(Number(amountTag[1]) / 1000);
-          if (sats > 0) {
-            stats.zapsSent.count++;
-            stats.zapsSent.totalSats += sats;
-          }
-        }
-        break;
     }
   }
-  
-  // Calculate average for sent zaps
-  stats.zapsSent.averageSats = stats.zapsSent.count > 0 
-    ? Math.round(stats.zapsSent.totalSats / stats.zapsSent.count) 
-    : 0;
 
   // Process incoming events (reactions, replies, zaps)
   for (const event of incomingEvents) {
@@ -327,6 +330,7 @@ export async function fetchNostrYearsStats(
           if (sats > 0) {
             stats.zapsReceived.count++;
             stats.zapsReceived.totalSats += sats;
+            addToMonthly(event.created_at, 'zapsReceived');
           }
         }
         break;
@@ -338,6 +342,23 @@ export async function fetchNostrYearsStats(
     ? Math.round(stats.zapsReceived.totalSats / stats.zapsReceived.count) 
     : 0;
 
+  // Process sent zaps (kind 9735 with #P tag = sender)
+  for (const event of sentZaps) {
+    const bolt11Tag = event.tags.find(t => t[0] === 'bolt11');
+    if (bolt11Tag && bolt11Tag[1]) {
+      const sats = extractSatsFromBolt11(bolt11Tag[1]);
+      if (sats > 0) {
+        stats.zapsSent.count++;
+        stats.zapsSent.totalSats += sats;
+        addToMonthly(event.created_at, 'zapsSent');
+      }
+    }
+  }
+  
+  // Calculate average for sent zaps
+  stats.zapsSent.averageSats = stats.zapsSent.count > 0 
+    ? Math.round(stats.zapsSent.totalSats / stats.zapsSent.count) 
+    : 0;
 
   onProgress?.({
     phase: 'calculating',
@@ -371,6 +392,8 @@ export async function fetchNostrYearsStats(
       kind42: counts.kind42,
       kind30023: counts.kind30023,
       receivedReactions: counts.receivedReactions,
+      zapsSent: counts.zapsSent,
+      zapsReceived: counts.zapsReceived,
     }))
     .sort((a, b) => a.month.localeCompare(b.month));
 
