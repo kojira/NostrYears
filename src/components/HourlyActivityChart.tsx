@@ -89,7 +89,8 @@ export function HourlyActivityChart({ data }: HourlyActivityChartProps) {
               <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} />
               <XAxis
                 dataKey="hour"
-                tickFormatter={(hour) => hour % 3 === 0 ? formatHour(hour) : ''}
+                tickFormatter={formatHour}
+                ticks={[0, 6, 12, 18, 23]}
                 tick={{ fill: theme.palette.text.secondary, fontSize: 11 }}
                 axisLine={{ stroke: theme.palette.divider }}
               />
