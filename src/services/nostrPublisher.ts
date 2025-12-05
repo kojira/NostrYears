@@ -43,8 +43,8 @@ export function createEventContent(stats: NostrYearsStats): NostrYearsEventConte
     kind7Count: stats.kind7Count,
     kind42Count: stats.kind42Count,
     imageCount: stats.imageCount,
-    topPostId: stats.topPostId,
-    topPostReactionCount: stats.topPostReactionCount,
+    topPosts: stats.topPosts,
+    topReactionEmojis: stats.topReactionEmojis,
   };
 }
 

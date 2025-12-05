@@ -24,6 +24,18 @@ export interface SignedEvent extends UnsignedEvent {
   sig: string;
 }
 
+// Top post info
+export interface TopPostInfo {
+  id: string;
+  reactionCount: number;
+}
+
+// Top reaction emoji info
+export interface TopReactionEmoji {
+  emoji: string;
+  count: number;
+}
+
 // NostrYears statistics
 export interface NostrYearsStats {
   pubkey: string;
@@ -41,8 +53,8 @@ export interface NostrYearsStats {
   kind7Count: number;
   kind42Count: number;
   imageCount: number;
-  topPostId: string | null;
-  topPostReactionCount: number;
+  topPosts: TopPostInfo[]; // Top 3 posts by reaction count
+  topReactionEmojis: TopReactionEmoji[]; // Top 3 reaction emojis used
   friendsRanking: FriendScore[];
 }
 
@@ -56,7 +68,7 @@ export interface FriendScore {
 }
 
 // App version for cache invalidation
-export const NOSTR_YEARS_VERSION = 2;
+export const NOSTR_YEARS_VERSION = 1;
 
 // kind 30078 event content structure
 export interface NostrYearsEventContent {
@@ -74,8 +86,8 @@ export interface NostrYearsEventContent {
   kind7Count: number;
   kind42Count: number;
   imageCount: number;
-  topPostId: string | null;
-  topPostReactionCount: number;
+  topPosts: TopPostInfo[];
+  topReactionEmojis: TopReactionEmoji[];
 }
 
 // Percentile data

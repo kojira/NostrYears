@@ -15,6 +15,13 @@ export function calculatePercentile(value: number, allValues: number[]): number 
 }
 
 /**
+ * Get top post reaction count from stats (first post or 0)
+ */
+function getTopReactionCount(stats: NostrYearsEventContent): number {
+  return stats.topPosts?.[0]?.reactionCount || 0;
+}
+
+/**
  * Calculate percentiles for all stats
  */
 export function calculateAllPercentiles(
@@ -28,7 +35,7 @@ export function calculateAllPercentiles(
   const kind7Counts = allStats.map(s => s.kind7Count);
   const kind42Counts = allStats.map(s => s.kind42Count);
   const imageCounts = allStats.map(s => s.imageCount);
-  const topPostReactionCounts = allStats.map(s => s.topPostReactionCount);
+  const topPostReactionCounts = allStats.map(s => getTopReactionCount(s));
 
   return {
     kind1Count: calculatePercentile(myStats.kind1Count, kind1Counts),
@@ -38,7 +45,7 @@ export function calculateAllPercentiles(
     kind7Count: calculatePercentile(myStats.kind7Count, kind7Counts),
     kind42Count: calculatePercentile(myStats.kind42Count, kind42Counts),
     imageCount: calculatePercentile(myStats.imageCount, imageCounts),
-    topPostReactionCount: calculatePercentile(myStats.topPostReactionCount, topPostReactionCounts),
+    topPostReactionCount: calculatePercentile(getTopReactionCount(myStats), topPostReactionCounts),
   };
 }
 

@@ -19,6 +19,13 @@ export function countCharsWithoutUrls(text: string): number {
 }
 
 /**
+ * Extract all URLs from content
+ */
+export function extractUrls(text: string): string[] {
+  return text.match(URL_PATTERN) || [];
+}
+
+/**
  * Extract image URLs from content
  */
 export function extractImageUrls(text: string): string[] {

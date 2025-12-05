@@ -8,11 +8,13 @@ import {
   Snackbar,
   Avatar,
   Chip,
+  Card,
+  CardContent,
 } from '@mui/material';
 import { nip19 } from 'nostr-tools';
 import { StatsCard } from './StatsCard';
 import { FriendsRanking } from './FriendsRanking';
-import { TopPost } from './TopPost';
+import { TopPosts } from './TopPosts';
 import type { NostrYearsStats, PercentileData } from '../types/nostr';
 import { hasNip07, publishNostrYearsStats, fetchAllNostrYearsEvents, createEventContent } from '../services/nostrPublisher';
 import { calculateAllPercentiles } from '../utils/percentile';
@@ -302,11 +304,65 @@ export function YearSummary({ stats, onReset, isFromCache, onRefresh }: YearSumm
           />
         </Grid>
 
-        {/* Top Post */}
+        {/* Top Reaction Emojis */}
+        {stats.topReactionEmojis.length > 0 && (
+          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+            <Card sx={{ height: '100%' }}>
+              <CardContent sx={{ p: 3 }}>
+                <Typography variant="h5" sx={{ mb: 2, fontWeight: 600 }}>
+                  😊 よく使ったリアクション
+                </Typography>
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                  {stats.topReactionEmojis.map((item, index) => (
+                    <Box
+                      key={index}
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        p: 1.5,
+                        borderRadius: 2,
+                        backgroundColor: index === 0 
+                          ? 'rgba(255, 215, 0, 0.1)' 
+                          : 'rgba(156, 39, 176, 0.05)',
+                        border: '1px solid',
+                        borderColor: index === 0 
+                          ? 'rgba(255, 215, 0, 0.3)' 
+                          : 'rgba(156, 39, 176, 0.1)',
+                      }}
+                    >
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                        <Typography sx={{ fontSize: index === 0 ? '2rem' : '1.5rem' }}>
+                          {['🥇', '🥈', '🥉'][index]}
+                        </Typography>
+                        <Typography sx={{ fontSize: index === 0 ? '2rem' : '1.5rem' }}>
+                          {item.emoji}
+                        </Typography>
+                      </Box>
+                      <Typography
+                        variant="h6"
+                        sx={{
+                          fontWeight: 700,
+                          background: 'linear-gradient(45deg, #9c27b0, #ff4081)',
+                          backgroundClip: 'text',
+                          WebkitBackgroundClip: 'text',
+                          WebkitTextFillColor: 'transparent',
+                        }}
+                      >
+                        {item.count.toLocaleString()}回
+                      </Typography>
+                    </Box>
+                  ))}
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+        )}
+
+        {/* Top Posts */}
         <Grid size={{ xs: 12, md: 6 }}>
-          <TopPost
-            eventId={stats.topPostId}
-            reactionCount={stats.topPostReactionCount}
+          <TopPosts
+            topPosts={stats.topPosts}
             relays={stats.relays}
           />
         </Grid>

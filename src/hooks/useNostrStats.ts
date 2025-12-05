@@ -55,8 +55,8 @@ export function useNostrStats(): UseNostrStatsReturn {
           kind7Count: existingStats.kind7Count,
           kind42Count: existingStats.kind42Count,
           imageCount: existingStats.imageCount,
-          topPostId: existingStats.topPostId,
-          topPostReactionCount: existingStats.topPostReactionCount,
+          topPosts: existingStats.topPosts || [],
+          topReactionEmojis: existingStats.topReactionEmojis || [],
           friendsRanking: [], // Not stored in published event
         };
         

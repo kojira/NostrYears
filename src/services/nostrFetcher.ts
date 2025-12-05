@@ -1,6 +1,6 @@
 import { NostrFetcher } from 'nostr-fetch';
 import type { NostrEvent } from 'nostr-fetch';
-import type { NostrYearsStats, FetchProgress, NostrProfile } from '../types/nostr';
+import type { NostrYearsStats, FetchProgress, NostrProfile, TopPostInfo, TopReactionEmoji } from '../types/nostr';
 import { countCharsWithoutUrls, countImages, extractPubkeysFromTags, isReply } from '../utils/textAnalysis';
 import { calculateFriendScores, addToCountMap } from '../utils/scoring';
 
@@ -90,10 +90,13 @@ export async function fetchNostrYearsStats(
     kind7Count: 0,
     kind42Count: 0,
     imageCount: 0,
-    topPostId: null,
-    topPostReactionCount: 0,
+    topPosts: [],
+    topReactionEmojis: [],
     friendsRanking: [],
   };
+
+  // Map to count reaction emojis
+  const reactionEmojiCounts = new Map<string, number>();
 
   // Maps for friend scoring
   const outgoingReactions = new Map<string, number>();
@@ -152,6 +155,9 @@ export async function fetchNostrYearsStats(
             addToCountMap(outgoingReactions, targetPubkey);
           }
         }
+        // Track reaction emoji
+        const emoji = event.content || '+';
+        addToCountMap(reactionEmojiCounts, emoji);
         break;
         
       case 42:
@@ -203,17 +209,21 @@ export async function fetchNostrYearsStats(
     });
   }
 
-  // Find top post
-  let topPostId: string | null = null;
-  let topReactionCount = 0;
-  for (const [postId, count] of kind1ReactionCounts) {
-    if (count > topReactionCount) {
-      topReactionCount = count;
-      topPostId = postId;
-    }
-  }
-  stats.topPostId = topPostId;
-  stats.topPostReactionCount = topReactionCount;
+  // Find top 3 posts by reaction count
+  const sortedPosts: TopPostInfo[] = Array.from(kind1ReactionCounts.entries())
+    .map(([id, reactionCount]) => ({ id, reactionCount }))
+    .sort((a, b) => b.reactionCount - a.reactionCount)
+    .slice(0, 3);
+  
+  stats.topPosts = sortedPosts;
+
+  // Find top 3 reaction emojis
+  const sortedEmojis: TopReactionEmoji[] = Array.from(reactionEmojiCounts.entries())
+    .map(([emoji, count]) => ({ emoji, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 3);
+  
+  stats.topReactionEmojis = sortedEmojis;
 
   onProgress?.({
     phase: 'fetching_mentions',
@@ -309,4 +319,3 @@ export async function fetchProfiles(
   
   return profiles;
 }
-
