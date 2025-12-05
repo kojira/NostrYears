@@ -366,53 +366,54 @@ export function YearSummary({ stats, onReset, isFromCache, onRefresh }: YearSumm
 
         {/* Top Reaction Emojis */}
         {stats.topReactionEmojis.length > 0 && (
-          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+          <Grid size={{ xs: 12, sm: 6, md: 6 }}>
             <Card sx={{ height: '100%' }}>
               <CardContent sx={{ p: 3 }}>
                 <Typography variant="h5" sx={{ mb: 2, fontWeight: 600 }}>
                   😊 Top Reactions
                 </Typography>
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                  {stats.topReactionEmojis.map((item, index) => (
-                    <Box
-                      key={index}
-                      sx={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        p: 1.5,
-                        borderRadius: 2,
-                        backgroundColor: index === 0 
-                          ? 'rgba(255, 215, 0, 0.1)' 
-                          : 'rgba(156, 39, 176, 0.05)',
-                        border: '1px solid',
-                        borderColor: index === 0 
-                          ? 'rgba(255, 215, 0, 0.3)' 
-                          : 'rgba(156, 39, 176, 0.1)',
-                      }}
-                    >
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                        <Typography sx={{ fontSize: index === 0 ? '2rem' : '1.5rem' }}>
-                          {['🥇', '🥈', '🥉'][index]}
-                        </Typography>
-                        <Typography sx={{ fontSize: index === 0 ? '2rem' : '1.5rem' }}>
-                          {item.emoji}
-                        </Typography>
-                      </Box>
-                      <Typography
-                        variant="h6"
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                  {stats.topReactionEmojis.map((item, index) => {
+                    const badges = ['🥇', '🥈', '🥉'];
+                    const rankDisplay = index < 3 ? badges[index] : `#${index + 1}`;
+                    
+                    return (
+                      <Box
+                        key={index}
                         sx={{
-                          fontWeight: 700,
-                          background: 'linear-gradient(45deg, #9c27b0, #ff4081)',
-                          backgroundClip: 'text',
-                          WebkitBackgroundClip: 'text',
-                          WebkitTextFillColor: 'transparent',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 1,
+                          p: 1,
+                          borderRadius: 2,
+                          backgroundColor: index === 0 
+                            ? 'rgba(255, 215, 0, 0.1)' 
+                            : 'rgba(156, 39, 176, 0.05)',
+                          border: '1px solid',
+                          borderColor: index === 0 
+                            ? 'rgba(255, 215, 0, 0.3)' 
+                            : 'rgba(156, 39, 176, 0.1)',
+                          minWidth: index < 3 ? 140 : 120,
                         }}
                       >
-                        {item.count.toLocaleString()}x
-                      </Typography>
-                    </Box>
-                  ))}
+                        <Typography sx={{ fontSize: index < 3 ? '1.2rem' : '0.9rem', minWidth: 24 }}>
+                          {rankDisplay}
+                        </Typography>
+                        <Typography sx={{ fontSize: index < 3 ? '1.5rem' : '1.2rem' }}>
+                          {item.emoji}
+                        </Typography>
+                        <Typography
+                          sx={{
+                            fontWeight: 600,
+                            fontSize: index < 3 ? '0.9rem' : '0.8rem',
+                            color: 'text.secondary',
+                          }}
+                        >
+                          {item.count.toLocaleString()}
+                        </Typography>
+                      </Box>
+                    );
+                  })}
                 </Box>
               </CardContent>
             </Card>

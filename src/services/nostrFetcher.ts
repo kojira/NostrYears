@@ -217,11 +217,11 @@ export async function fetchNostrYearsStats(
   
   stats.topPosts = sortedPosts;
 
-  // Find top 3 reaction emojis
+  // Find top 10 reaction emojis
   const sortedEmojis: TopReactionEmoji[] = Array.from(reactionEmojiCounts.entries())
     .map(([emoji, count]) => ({ emoji, count }))
     .sort((a, b) => b.count - a.count)
-    .slice(0, 3);
+    .slice(0, 10);
   
   stats.topReactionEmojis = sortedEmojis;
 
