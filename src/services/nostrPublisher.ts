@@ -55,9 +55,11 @@ export function createEventContent(stats: NostrYearsStats): NostrYearsEventConte
 
 /**
  * Publish NostrYears stats to relays using NIP-07
+ * Also publishes a kind 1 note with the summary text
  */
 export async function publishNostrYearsStats(
   stats: NostrYearsStats,
+  summaryText: string,
   relays: string[] = DEFAULT_RELAYS
 ): Promise<boolean> {
   if (!hasNip07()) {
@@ -67,7 +69,8 @@ export async function publishNostrYearsStats(
 
   const content = createEventContent(stats);
   
-  const unsignedEvent: UnsignedEvent = {
+  // Kind 30078 event (stats data)
+  const statsEvent: UnsignedEvent = {
     kind: NOSTR_YEARS_KIND,
     created_at: Math.floor(Date.now() / 1000),
     tags: [
@@ -77,15 +80,27 @@ export async function publishNostrYearsStats(
     content: JSON.stringify(content),
   };
 
+  // Kind 1 event (summary post)
+  const noteEvent: UnsignedEvent = {
+    kind: 1,
+    created_at: Math.floor(Date.now() / 1000),
+    tags: [
+      ['t', 'nostryears'],
+    ],
+    content: summaryText,
+  };
+
   try {
-    // Sign with NIP-07
-    const signedEvent = await window.nostr!.signEvent(unsignedEvent);
+    // Sign both events with NIP-07
+    const signedStatsEvent = await window.nostr!.signEvent(statsEvent);
+    const signedNoteEvent = await window.nostr!.signEvent(noteEvent);
     
     // Publish to relays
     const publishPromises = relays.map(async (relayUrl) => {
       try {
         const relay = await Relay.connect(relayUrl);
-        await relay.publish(signedEvent);
+        await relay.publish(signedStatsEvent);
+        await relay.publish(signedNoteEvent);
         relay.close();
         return true;
       } catch (error) {

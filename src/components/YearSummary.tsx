@@ -65,41 +65,6 @@ export function YearSummary({ stats, onReset, isFromCache, onRefresh }: YearSumm
     loadPercentiles();
   }, [stats]);
 
-  const handlePublish = async () => {
-    setPublishing(true);
-    const success = await publishNostrYearsStats(stats, stats.relays);
-    setPublishing(false);
-    
-    if (success) {
-      setPublished(true);
-      setSnackbar({
-        open: true,
-        message: 'Posted to relays!',
-        severity: 'success',
-      });
-      
-      const allStats = await fetchAllNostrYearsEvents(stats.relays);
-      const sameRelayStats = allStats.filter(s => 
-        s.relays && 
-        s.relays.length === stats.relays.length &&
-        s.relays.every(r => stats.relays.includes(r))
-      );
-      setPercentileCount(sameRelayStats.length);
-      
-      if (sameRelayStats.length > 0) {
-        const myContent = createEventContent(stats);
-        const calculated = calculateAllPercentiles(myContent, sameRelayStats);
-        setPercentiles(calculated);
-      }
-    } else {
-      setSnackbar({
-        open: true,
-        message: 'Failed to post to relays',
-        severity: 'error',
-      });
-    }
-  };
-
   const getDisplayName = (): string => {
     if (stats.profile?.display_name) return stats.profile.display_name;
     if (stats.profile?.name) return stats.profile.name;
@@ -155,6 +120,41 @@ export function YearSummary({ stats, onReset, isFromCache, onRefresh }: YearSumm
 
     return lines.join('\n');
   }, [stats, periodString]);
+
+  const handlePublish = async () => {
+    setPublishing(true);
+    const success = await publishNostrYearsStats(stats, summaryText, stats.relays);
+    setPublishing(false);
+    
+    if (success) {
+      setPublished(true);
+      setSnackbar({
+        open: true,
+        message: 'Posted to relays!',
+        severity: 'success',
+      });
+      
+      const allStats = await fetchAllNostrYearsEvents(stats.relays);
+      const sameRelayStats = allStats.filter(s => 
+        s.relays && 
+        s.relays.length === stats.relays.length &&
+        s.relays.every(r => stats.relays.includes(r))
+      );
+      setPercentileCount(sameRelayStats.length);
+      
+      if (sameRelayStats.length > 0) {
+        const myContent = createEventContent(stats);
+        const calculated = calculateAllPercentiles(myContent, sameRelayStats);
+        setPercentiles(calculated);
+      }
+    } else {
+      setSnackbar({
+        open: true,
+        message: 'Failed to post to relays',
+        severity: 'error',
+      });
+    }
+  };
 
   const handleCopy = async () => {
     try {
