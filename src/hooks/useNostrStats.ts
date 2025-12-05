@@ -71,6 +71,8 @@ export function useNostrStats(): UseNostrStatsReturn {
           topReactionEmojis: existingStats.topReactionEmojis || [],
           friendsRanking: [], // Not stored in published event
           monthlyActivity: existingStats.monthlyActivity || [],
+          zapsReceived: existingStats.zapsReceived || { count: 0, totalSats: 0, averageSats: 0 },
+          zapsSent: existingStats.zapsSent || { count: 0, totalSats: 0, averageSats: 0 },
         };
         
         setProgress({ phase: 'done', message: 'Using cached results', progress: 100 });

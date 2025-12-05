@@ -3,6 +3,23 @@ import type { NostrEvent } from 'nostr-fetch';
 import type { NostrYearsStats, FetchProgress, NostrProfile, TopPostInfo, TopReactionEmoji } from '../types/nostr';
 import { countCharsWithoutUrls, countImages, extractPubkeysFromTags, isReply } from '../utils/textAnalysis';
 import { calculateFriendScores, addToCountMap } from '../utils/scoring';
+import { decode as decodeBolt11 } from 'light-bolt11-decoder';
+
+// Helper to extract sats amount from bolt11 invoice
+function extractSatsFromBolt11(bolt11: string): number {
+  try {
+    const decoded = decodeBolt11(bolt11);
+    const amountSection = decoded.sections.find((s: { name: string }) => s.name === 'amount');
+    if (amountSection && 'value' in amountSection) {
+      // Amount is in millisatoshis
+      return Math.floor(Number(amountSection.value) / 1000);
+    }
+  } catch {
+    // Failed to decode
+  }
+  return 0;
+}
+
 
 // Helper to get month key from timestamp
 function getMonthKey(timestamp: number): string {
@@ -140,38 +157,25 @@ export async function fetchNostrYearsStats(
     progress: 5,
   });
 
+  // Phase 1: Fetch own events (5% - 50%)
   const ownEvents = await fetchWithProgress(
-    { kinds: [1, 6, 7, 42, 30023], authors: [pubkey] },
+    { kinds: [1, 6, 7, 42, 30023, 9734], authors: [pubkey] },
     'Fetching posts...',
     5,
-    40
+    50
   );
 
-  // Phase 2: Fetch reactions to my posts (40% - 60%)
+  // Phase 2: Fetch incoming events (reactions, replies, zaps) (50% - 80%)
   onProgress?.({
     phase: 'fetching_reactions',
-    message: 'Fetching reactions...',
-    progress: 40,
+    message: 'Fetching incoming events...',
+    progress: 50,
   });
 
-  const incomingReactionsEvents = await fetchWithProgress(
-    { kinds: [7], '#p': [pubkey] },
-    'Fetching reactions...',
-    40,
-    60
-  );
-
-  // Phase 3: Fetch replies mentioning me (60% - 80%)
-  onProgress?.({
-    phase: 'fetching_mentions',
-    message: 'Fetching replies...',
-    progress: 60,
-  });
-
-  const mentionEvents = await fetchWithProgress(
-    { kinds: [1], '#p': [pubkey] },
-    'Fetching replies...',
-    60,
+  const incomingEvents = await fetchWithProgress(
+    { kinds: [1, 7, 9735], '#p': [pubkey] },
+    'Fetching reactions, replies, zaps...',
+    50,
     80
   );
 
@@ -205,6 +209,8 @@ export async function fetchNostrYearsStats(
     topReactionEmojis: [],
     friendsRanking: [],
     monthlyActivity: [],
+    zapsReceived: { count: 0, totalSats: 0, averageSats: 0 },
+    zapsSent: { count: 0, totalSats: 0, averageSats: 0 },
   };
 
   // Helper to increment monthly count
@@ -267,39 +273,76 @@ export async function fetchNostrYearsStats(
         stats.kind30023Chars += countCharsWithoutUrls(event.content);
         addToMonthly(event.created_at, 'kind30023');
         break;
+        
+      case 9734:
+        // Zap request - track sent zaps
+        const amountTag = event.tags.find(t => t[0] === 'amount');
+        if (amountTag && amountTag[1]) {
+          const sats = Math.floor(Number(amountTag[1]) / 1000);
+          if (sats > 0) {
+            stats.zapsSent.count++;
+            stats.zapsSent.totalSats += sats;
+          }
+        }
+        break;
     }
   }
+  
+  // Calculate average for sent zaps
+  stats.zapsSent.averageSats = stats.zapsSent.count > 0 
+    ? Math.round(stats.zapsSent.totalSats / stats.zapsSent.count) 
+    : 0;
 
-  // Process incoming reactions (reactions to my posts)
-  for (const reaction of incomingReactionsEvents) {
-    if (reaction.pubkey === pubkey) continue; // Skip self-reactions
+  // Process incoming events (reactions, replies, zaps)
+  for (const event of incomingEvents) {
+    if (event.pubkey === pubkey) continue; // Skip self-events
     
-    // Find which of my posts this reaction is for
-    const eTag = reaction.tags.find(t => t[0] === 'e');
-    if (eTag) {
-      const postId = eTag[1];
-      // Only count if it's a reaction to my kind 1 post
-      if (ownKind1Ids.has(postId)) {
-        kind1ReactionCounts.set(postId, (kind1ReactionCounts.get(postId) || 0) + 1);
-      }
-      addToCountMap(incomingReactions, reaction.pubkey);
-      // Track received reactions
-      stats.receivedReactionsCount++;
-      addToMonthly(reaction.created_at, 'receivedReactions');
+    switch (event.kind) {
+      case 7:
+        // Reaction to my post
+        const eTag = event.tags.find(t => t[0] === 'e');
+        if (eTag) {
+          const postId = eTag[1];
+          if (ownKind1Ids.has(postId)) {
+            kind1ReactionCounts.set(postId, (kind1ReactionCounts.get(postId) || 0) + 1);
+          }
+          addToCountMap(incomingReactions, event.pubkey);
+          stats.receivedReactionsCount++;
+          addToMonthly(event.created_at, 'receivedReactions');
+        }
+        break;
+        
+      case 1:
+        // Reply mentioning me
+        if (isReply(event.tags)) {
+          addToCountMap(incomingReplies, event.pubkey);
+        }
+        break;
+        
+      case 9735:
+        // Zap receipt to me
+        const bolt11Tag = event.tags.find(t => t[0] === 'bolt11');
+        if (bolt11Tag && bolt11Tag[1]) {
+          const sats = extractSatsFromBolt11(bolt11Tag[1]);
+          if (sats > 0) {
+            stats.zapsReceived.count++;
+            stats.zapsReceived.totalSats += sats;
+          }
+        }
+        break;
     }
   }
+  
+  // Calculate average for received zaps
+  stats.zapsReceived.averageSats = stats.zapsReceived.count > 0 
+    ? Math.round(stats.zapsReceived.totalSats / stats.zapsReceived.count) 
+    : 0;
 
-  // Process replies
-  for (const event of mentionEvents) {
-    if (event.pubkey !== pubkey && isReply(event.tags)) {
-      addToCountMap(incomingReplies, event.pubkey);
-    }
-  }
 
   onProgress?.({
     phase: 'calculating',
     message: 'Calculating statistics...',
-    progress: 80,
+    progress: 85,
   });
 
   // Find top 3 posts by reaction count

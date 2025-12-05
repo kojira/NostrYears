@@ -136,6 +136,16 @@ export function YearSummary({ stats, onReset, isFromCache, onRefresh }: YearSumm
       `💬 Chat messages: ${stats.kind42Count.toLocaleString()}`,
     ];
 
+    if (stats.zapsReceived.count > 0 || stats.zapsSent.count > 0) {
+      lines.push(``);
+      if (stats.zapsReceived.count > 0) {
+        lines.push(`⚡ Zaps received: ${stats.zapsReceived.count} (${stats.zapsReceived.totalSats.toLocaleString()} sats)`);
+      }
+      if (stats.zapsSent.count > 0) {
+        lines.push(`💸 Zaps sent: ${stats.zapsSent.count} (${stats.zapsSent.totalSats.toLocaleString()} sats)`);
+      }
+    }
+
     if (stats.topReactionEmojis.length > 0) {
       lines.push(``, `Top reactions: ${stats.topReactionEmojis.map(e => `${e.emoji}(${e.count})`).join(' ')}`);
     }
@@ -375,6 +385,59 @@ export function YearSummary({ stats, onReset, isFromCache, onRefresh }: YearSumm
             color="#4caf50"
           />
         </Grid>
+
+        {/* Zap Statistics */}
+        {(stats.zapsReceived.count > 0 || stats.zapsSent.count > 0) && (
+          <>
+            <Grid size={{ xs: 12 }}>
+              <Typography variant="h5" sx={{ mt: 2, mb: 1, fontWeight: 600 }}>
+                ⚡ Zap Statistics
+              </Typography>
+            </Grid>
+            
+            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+              <Card sx={{ height: '100%' }}>
+                <CardContent sx={{ p: 3 }}>
+                  <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                    ⚡ Zaps Received
+                  </Typography>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                    <Typography variant="body1">
+                      Count: <strong>{stats.zapsReceived.count.toLocaleString()}</strong>
+                    </Typography>
+                    <Typography variant="body1">
+                      Total: <strong>{stats.zapsReceived.totalSats.toLocaleString()}</strong> sats
+                    </Typography>
+                    <Typography variant="body1">
+                      Average: <strong>{stats.zapsReceived.averageSats.toLocaleString()}</strong> sats
+                    </Typography>
+                  </Box>
+                </CardContent>
+              </Card>
+            </Grid>
+            
+            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+              <Card sx={{ height: '100%' }}>
+                <CardContent sx={{ p: 3 }}>
+                  <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                    💸 Zaps Sent
+                  </Typography>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                    <Typography variant="body1">
+                      Count: <strong>{stats.zapsSent.count.toLocaleString()}</strong>
+                    </Typography>
+                    <Typography variant="body1">
+                      Total: <strong>{stats.zapsSent.totalSats.toLocaleString()}</strong> sats
+                    </Typography>
+                    <Typography variant="body1">
+                      Average: <strong>{stats.zapsSent.averageSats.toLocaleString()}</strong> sats
+                    </Typography>
+                  </Box>
+                </CardContent>
+              </Card>
+            </Grid>
+          </>
+        )}
 
         {/* Top Reaction Emojis */}
         {stats.topReactionEmojis.length > 0 && (

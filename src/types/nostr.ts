@@ -47,6 +47,13 @@ export interface MonthlyActivity {
   receivedReactions: number; // Reactions received on my posts
 }
 
+// Zap statistics
+export interface ZapStats {
+  count: number;
+  totalSats: number;
+  averageSats: number;
+}
+
 // NostrYears statistics
 export interface NostrYearsStats {
   pubkey: string;
@@ -69,6 +76,8 @@ export interface NostrYearsStats {
   topReactionEmojis: TopReactionEmoji[]; // Top 3 reaction emojis used
   friendsRanking: FriendScore[];
   monthlyActivity: MonthlyActivity[]; // Monthly activity breakdown
+  zapsReceived: ZapStats;
+  zapsSent: ZapStats;
 }
 
 export interface FriendScore {
@@ -81,7 +90,7 @@ export interface FriendScore {
 }
 
 // App version for cache invalidation
-export const NOSTR_YEARS_VERSION = 2;
+export const NOSTR_YEARS_VERSION = 3;
 
 // kind 30078 event content structure
 export interface NostrYearsEventContent {
@@ -103,6 +112,8 @@ export interface NostrYearsEventContent {
   topPosts: TopPostInfo[];
   topReactionEmojis: TopReactionEmoji[];
   monthlyActivity: MonthlyActivity[];
+  zapsReceived: ZapStats;
+  zapsSent: ZapStats;
 }
 
 // Percentile data
