@@ -14,6 +14,7 @@ import { nip19 } from 'nostr-tools';
 import { hasNip07, getPubkeyFromNip07 } from '../services/nostrPublisher';
 import { DEFAULT_RELAYS, fetchProfile } from '../services/nostrFetcher';
 import { RelaySettings } from './RelaySettings';
+import { RecentResults } from './RecentResults';
 import type { FetchProgress, NostrProfile } from '../types/nostr';
 
 interface InputFormProps {
@@ -125,6 +126,18 @@ export function InputForm({ onSubmit, isLoading, progress }: InputFormProps) {
       }
     } else {
       setError('Failed to get public key from NIP-07 extension');
+    }
+  };
+
+  const handleSelectRecentUser = async (pubkey: string) => {
+    try {
+      const npub = nip19.npubEncode(pubkey);
+      setNpubInput(npub);
+      setPreviewPubkey(pubkey);
+      const profile = await fetchProfile(pubkey, relays);
+      setPreviewProfile(profile);
+    } catch {
+      setNpubInput(pubkey);
     }
   };
 
@@ -409,6 +422,16 @@ export function InputForm({ onSubmit, isLoading, progress }: InputFormProps) {
         >
           💡 Install a NIP-07 extension (nos2x, Alby, etc.) to post your results to relays and compare with other users
         </Typography>
+      )}
+
+      {/* Recent Results */}
+      {!isLoading && (
+        <Box sx={{ width: '100%', maxWidth: 600 }}>
+          <RecentResults
+            relays={relays}
+            onSelectUser={handleSelectRecentUser}
+          />
+        </Box>
       )}
     </Box>
   );

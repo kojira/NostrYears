@@ -195,3 +195,63 @@ export async function fetchOwnNostrYearsEventWithRelays(
   
   return null;
 }
+
+// Recent result with pubkey
+export interface RecentNostrYearsResult {
+  pubkey: string;
+  createdAt: number;
+  content: NostrYearsEventContent;
+}
+
+/**
+ * Fetch recent NostrYears events from relays
+ */
+export async function fetchRecentNostrYearsEvents(
+  relays: string[] = DEFAULT_RELAYS,
+  limit: number = 20
+): Promise<RecentNostrYearsResult[]> {
+  const fetcher = initFetcher();
+  
+  try {
+    const events = await fetcher.fetchAllEvents(
+      relays,
+      { 
+        kinds: [NOSTR_YEARS_KIND],
+        '#d': [NOSTR_YEARS_D_TAG],
+      },
+      {},
+      { sort: true }
+    );
+
+    const results: RecentNostrYearsResult[] = [];
+    const seenPubkeys = new Set<string>();
+    
+    for (const event of events) {
+      // Skip if we already have a result from this pubkey (keep most recent)
+      if (seenPubkeys.has(event.pubkey)) continue;
+      
+      try {
+        const content = JSON.parse(event.content) as NostrYearsEventContent;
+        // Validate version
+        if (content.version === NOSTR_YEARS_VERSION) {
+          seenPubkeys.add(event.pubkey);
+          results.push({
+            pubkey: event.pubkey,
+            createdAt: event.created_at,
+            content,
+          });
+          
+          if (results.length >= limit) break;
+        }
+      } catch {
+        // Invalid JSON, skip
+      }
+    }
+    
+    // Sort by createdAt descending
+    return results.sort((a, b) => b.createdAt - a.createdAt);
+  } catch (error) {
+    console.error('Error fetching recent NostrYears events:', error);
+    return [];
+  }
+}
