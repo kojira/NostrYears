@@ -80,6 +80,14 @@ export function RecentResults({ relays, onLoadCachedResult }: RecentResultsProps
     return `${year}/${month}/${day} ${hours}:${minutes}`;
   };
 
+  const formatPeriod = (timestamp: number): string => {
+    const date = new Date(timestamp * 1000);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}/${month}/${day}`;
+  };
+
   const displayResults = expanded ? results : results.slice(0, 6);
 
   if (loading) {
@@ -160,6 +168,13 @@ export function RecentResults({ relays, onLoadCachedResult }: RecentResultsProps
                   </Typography>
                 </Box>
               </Box>
+              
+              {/* Period */}
+              {result.content.period && (
+                <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mb: 0.5, fontSize: '0.65rem' }}>
+                  📅 {formatPeriod(result.content.period.since)} - {formatPeriod(result.content.period.until)}
+                </Typography>
+              )}
               
               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                 <Chip
