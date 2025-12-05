@@ -22,7 +22,7 @@ import { TopPosts } from './TopPosts';
 import { MonthlyActivityChart } from './MonthlyActivityChart';
 import { HourlyActivityChart } from './HourlyActivityChart';
 import type { NostrYearsStats, PercentileData } from '../types/nostr';
-import { hasNip07, publishNostrYearsStats, fetchAllNostrYearsEvents, createEventContent } from '../services/nostrPublisher';
+import { hasNip07, getPubkeyFromNip07, publishNostrYearsStats, fetchAllNostrYearsEvents, createEventContent } from '../services/nostrPublisher';
 import { calculateAllPercentiles } from '../utils/percentile';
 
 interface YearSummaryProps {
@@ -37,11 +37,25 @@ export function YearSummary({ stats, onReset, isFromCache, onRefresh }: YearSumm
   const [percentileCount, setPercentileCount] = useState(0);
   const [publishing, setPublishing] = useState(false);
   const [published, setPublished] = useState(false);
+  const [isOwnProfile, setIsOwnProfile] = useState(false);
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
     open: false,
     message: '',
     severity: 'success',
   });
+
+  // Check if the current user is viewing their own profile
+  useEffect(() => {
+    const checkOwnership = async () => {
+      if (hasNip07()) {
+        const myPubkey = await getPubkeyFromNip07();
+        setIsOwnProfile(myPubkey === stats.pubkey);
+      } else {
+        setIsOwnProfile(false);
+      }
+    };
+    checkOwnership();
+  }, [stats.pubkey]);
 
   useEffect(() => {
     const loadPercentiles = async () => {
@@ -273,7 +287,7 @@ export function YearSummary({ stats, onReset, isFromCache, onRefresh }: YearSumm
               </Button>
             )}
             
-            {hasNip07() && !published && !isFromCache && (
+            {hasNip07() && isOwnProfile && !published && !isFromCache && (
               <Button
                 variant="contained"
                 size="small"
