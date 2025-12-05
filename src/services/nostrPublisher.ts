@@ -323,17 +323,18 @@ export async function fetchRecentNostrYearsEvents(
     const allEvents = Array.from(eventMap.values()).sort((a, b) => b.created_at - a.created_at);
 
     const results: RecentNostrYearsResult[] = [];
-    const seenPubkeys = new Set<string>();
+    const seenKeys = new Set<string>();
     
     for (const event of allEvents) {
-      // Skip if we already have a result from this pubkey (keep most recent)
-      if (seenPubkeys.has(event.pubkey)) continue;
-      
       try {
         const content = JSON.parse(event.content) as NostrYearsEventContent;
         // Accept any version (show all results)
         if (content.version) {
-          seenPubkeys.add(event.pubkey);
+          // Use pubkey + period as unique key (same user with different periods should show separately)
+          const uniqueKey = `${event.pubkey}-${content.period?.since}-${content.period?.until}`;
+          if (seenKeys.has(uniqueKey)) continue;
+          
+          seenKeys.add(uniqueKey);
           results.push({
             pubkey: event.pubkey,
             createdAt: event.created_at,
