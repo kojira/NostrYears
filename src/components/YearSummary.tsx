@@ -20,9 +20,11 @@ import { calculateAllPercentiles } from '../utils/percentile';
 interface YearSummaryProps {
   stats: NostrYearsStats;
   onReset: () => void;
+  isFromCache?: boolean;
+  onRefresh?: () => void;
 }
 
-export function YearSummary({ stats, onReset }: YearSummaryProps) {
+export function YearSummary({ stats, onReset, isFromCache, onRefresh }: YearSummaryProps) {
   const [percentiles, setPercentiles] = useState<PercentileData | null>(null);
   const [percentileCount, setPercentileCount] = useState(0);
   const [publishing, setPublishing] = useState(false);
@@ -167,32 +169,60 @@ export function YearSummary({ stats, onReset }: YearSummaryProps) {
             の2025年のNostr活動まとめ
           </Typography>
           
-          {/* Publish button */}
-          {hasNip07() && !published && (
-            <Button
-              variant="contained"
-              size="small"
-              onClick={handlePublish}
-              disabled={publishing}
-              sx={{
-                mt: 2,
-                background: 'linear-gradient(45deg, #9c27b0, #ff4081)',
-                '&:hover': {
-                  background: 'linear-gradient(45deg, #7b1fa2, #c60055)',
-                },
-              }}
-            >
-              {publishing ? '投稿中...' : '📤 結果をリレーに投稿'}
-            </Button>
-          )}
-          
-          {published && (
+          {/* Cache indicator */}
+          {isFromCache && (
             <Chip
-              label="✓ 投稿済み"
+              label="📦 投稿済みデータを表示中"
               size="small"
-              sx={{ mt: 2, backgroundColor: 'rgba(76, 175, 80, 0.2)', color: '#4caf50' }}
+              sx={{ 
+                mt: 1,
+                backgroundColor: 'rgba(33, 150, 243, 0.2)', 
+                color: '#2196f3',
+              }}
             />
           )}
+          
+          {/* Action buttons */}
+          <Box sx={{ display: 'flex', gap: 1, mt: 2, flexWrap: 'wrap', justifyContent: 'center' }}>
+            {isFromCache && onRefresh && (
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={onRefresh}
+                sx={{
+                  borderColor: 'rgba(255,255,255,0.3)',
+                  color: 'text.secondary',
+                }}
+              >
+                🔄 再集計する
+              </Button>
+            )}
+            
+            {hasNip07() && !published && !isFromCache && (
+              <Button
+                variant="contained"
+                size="small"
+                onClick={handlePublish}
+                disabled={publishing}
+                sx={{
+                  background: 'linear-gradient(45deg, #9c27b0, #ff4081)',
+                  '&:hover': {
+                    background: 'linear-gradient(45deg, #7b1fa2, #c60055)',
+                  },
+                }}
+              >
+                {publishing ? '投稿中...' : '📤 結果をリレーに投稿'}
+              </Button>
+            )}
+            
+            {(published || isFromCache) && (
+              <Chip
+                label="✓ 投稿済み"
+                size="small"
+                sx={{ backgroundColor: 'rgba(76, 175, 80, 0.2)', color: '#4caf50' }}
+              />
+            )}
+          </Box>
         </Box>
       </Box>
 
@@ -281,10 +311,12 @@ export function YearSummary({ stats, onReset }: YearSummaryProps) {
           />
         </Grid>
 
-        {/* Friends Ranking */}
-        <Grid size={{ xs: 12, md: 6 }}>
-          <FriendsRanking friends={stats.friendsRanking} relays={stats.relays} />
-        </Grid>
+        {/* Friends Ranking - only show if not from cache */}
+        {!isFromCache && (
+          <Grid size={{ xs: 12, md: 6 }}>
+            <FriendsRanking friends={stats.friendsRanking} relays={stats.relays} />
+          </Grid>
+        )}
 
         {/* Long article stats */}
         {stats.kind30023Count > 0 && (

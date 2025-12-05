@@ -1,3 +1,4 @@
+import { useState, useCallback } from 'react';
 import { ThemeProvider, CssBaseline, Box, Alert } from '@mui/material';
 import { theme } from './theme';
 import { InputForm } from './components/InputForm';
@@ -5,7 +6,26 @@ import { YearSummary } from './components/YearSummary';
 import { useNostrStats } from './hooks/useNostrStats';
 
 function App() {
-  const { stats, isLoading, progress, error, fetchStats, reset } = useNostrStats();
+  const { stats, isLoading, progress, error, isFromCache, fetchStats, reset } = useNostrStats();
+  const [lastPubkey, setLastPubkey] = useState<string | null>(null);
+  const [lastRelays, setLastRelays] = useState<string[]>([]);
+
+  const handleSubmit = useCallback((pubkey: string, relays: string[]) => {
+    setLastPubkey(pubkey);
+    setLastRelays(relays);
+    fetchStats(pubkey, relays);
+  }, [fetchStats]);
+
+  const handleRefresh = useCallback(() => {
+    if (lastPubkey && lastRelays.length > 0) {
+      // Reset and refetch with force flag (will be implemented)
+      reset();
+      // Small delay to ensure reset completes
+      setTimeout(() => {
+        fetchStats(lastPubkey, lastRelays);
+      }, 100);
+    }
+  }, [lastPubkey, lastRelays, reset, fetchStats]);
 
   return (
     <ThemeProvider theme={theme}>
@@ -20,7 +40,7 @@ function App() {
         {!stats ? (
           <Box sx={{ maxWidth: 600, mx: 'auto', px: 2 }}>
             <InputForm
-              onSubmit={fetchStats}
+              onSubmit={handleSubmit}
               isLoading={isLoading}
               progress={progress}
             />
@@ -31,7 +51,12 @@ function App() {
             )}
           </Box>
         ) : (
-          <YearSummary stats={stats} onReset={reset} />
+          <YearSummary 
+            stats={stats} 
+            onReset={reset} 
+            isFromCache={isFromCache}
+            onRefresh={handleRefresh}
+          />
         )}
       </Box>
     </ThemeProvider>

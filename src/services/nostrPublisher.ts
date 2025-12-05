@@ -166,3 +166,29 @@ export async function fetchOwnNostrYearsEvent(
   return null;
 }
 
+/**
+ * Check if arrays have the same elements (order independent)
+ */
+function arraysEqual(a: string[], b: string[]): boolean {
+  if (a.length !== b.length) return false;
+  const sortedA = [...a].sort();
+  const sortedB = [...b].sort();
+  return sortedA.every((val, idx) => val === sortedB[idx]);
+}
+
+/**
+ * Fetch user's own NostrYears event with matching relays
+ */
+export async function fetchOwnNostrYearsEventWithRelays(
+  pubkey: string,
+  relays: string[]
+): Promise<NostrYearsEventContent | null> {
+  const content = await fetchOwnNostrYearsEvent(pubkey, relays);
+  
+  if (content && content.relays && arraysEqual(content.relays, relays)) {
+    return content;
+  }
+  
+  return null;
+}
+
