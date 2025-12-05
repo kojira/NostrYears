@@ -3,8 +3,17 @@ import type { NostrYearsStats, NostrYearsEventContent, UnsignedEvent } from '../
 import { NOSTR_YEARS_VERSION } from '../types/nostr';
 import { DEFAULT_RELAYS, initFetcher } from './nostrFetcher';
 
-const NOSTR_YEARS_D_TAG = 'nostr-years-2025';
+const NOSTR_YEARS_D_TAG_PREFIX = 'nostr-years-2025';
 const NOSTR_YEARS_KIND = 30078;
+
+/**
+ * Generate unique d-tag based on version, period and relays
+ * This ensures different configurations don't overwrite each other
+ */
+function generateDTag(version: number, since: number, until: number, relays: string[]): string {
+  const sortedRelays = [...relays].sort().join(',');
+  return `${NOSTR_YEARS_D_TAG_PREFIX}-v${version}-${since}-${until}-${sortedRelays}`;
+}
 
 /**
  * Check if NIP-07 extension is available
@@ -68,13 +77,15 @@ export async function publishNostrYearsStats(
   }
 
   const content = createEventContent(stats);
+  const dTag = generateDTag(NOSTR_YEARS_VERSION, stats.period.since, stats.period.until, stats.relays);
   
   // Kind 30078 event (stats data)
   const statsEvent: UnsignedEvent = {
     kind: NOSTR_YEARS_KIND,
     created_at: Math.floor(Date.now() / 1000),
     tags: [
-      ['d', NOSTR_YEARS_D_TAG],
+      ['d', dTag],
+      ['t', 'nostryears'],  // For filtering NostrYears events
       ['version', String(NOSTR_YEARS_VERSION)],
     ],
     content: JSON.stringify(content),
@@ -120,6 +131,7 @@ export async function publishNostrYearsStats(
 /**
  * Fetch all NostrYears events from relays (for percentile calculation)
  * Only returns events with matching version
+ * Fetches both old format (d-tag only) and new format (t-tag) for compatibility
  */
 export async function fetchAllNostrYearsEvents(
   relays: string[] = DEFAULT_RELAYS
@@ -127,18 +139,31 @@ export async function fetchAllNostrYearsEvents(
   const fetcher = initFetcher();
   
   try {
-    const events = await fetcher.fetchAllEvents(
-      relays,
-      { 
-        kinds: [NOSTR_YEARS_KIND],
-        '#d': [NOSTR_YEARS_D_TAG],
-      },
-      {}
-    );
+    // Fetch both old format (d-tag) and new format (t-tag) in parallel
+    const [oldEvents, newEvents] = await Promise.all([
+      fetcher.fetchAllEvents(
+        relays,
+        { kinds: [NOSTR_YEARS_KIND], '#d': ['nostr-years-2025'] },
+        {}
+      ),
+      fetcher.fetchAllEvents(
+        relays,
+        { kinds: [NOSTR_YEARS_KIND], '#t': ['nostryears'] },
+        {}
+      ),
+    ]);
+
+    // Merge and deduplicate by event id
+    const eventMap = new Map<string, typeof oldEvents[0]>();
+    for (const event of [...oldEvents, ...newEvents]) {
+      if (!eventMap.has(event.id)) {
+        eventMap.set(event.id, event);
+      }
+    }
 
     const contents: NostrYearsEventContent[] = [];
     
-    for (const event of events) {
+    for (const event of eventMap.values()) {
       try {
         const content = JSON.parse(event.content) as NostrYearsEventContent;
         // Validate version only (period can vary)
@@ -158,36 +183,57 @@ export async function fetchAllNostrYearsEvents(
 }
 
 /**
- * Fetch user's own NostrYears event
+ * Fetch user's own NostrYears events (all versions/periods)
+ * Fetches both old format (d-tag only) and new format (t-tag) for compatibility
  */
-export async function fetchOwnNostrYearsEvent(
+export async function fetchOwnNostrYearsEvents(
   pubkey: string,
   relays: string[] = DEFAULT_RELAYS
-): Promise<NostrYearsEventContent | null> {
+): Promise<NostrYearsEventContent[]> {
   const fetcher = initFetcher();
   
   try {
-    const event = await fetcher.fetchLastEvent(
-      relays,
-      {
-        kinds: [NOSTR_YEARS_KIND],
-        authors: [pubkey],
-        '#d': [NOSTR_YEARS_D_TAG],
-      }
-    );
+    // Fetch both old format (d-tag) and new format (t-tag) in parallel
+    const [oldEvents, newEvents] = await Promise.all([
+      fetcher.fetchAllEvents(
+        relays,
+        { kinds: [NOSTR_YEARS_KIND], authors: [pubkey], '#d': ['nostr-years-2025'] },
+        {},
+        { sort: true }
+      ),
+      fetcher.fetchAllEvents(
+        relays,
+        { kinds: [NOSTR_YEARS_KIND], authors: [pubkey], '#t': ['nostryears'] },
+        {},
+        { sort: true }
+      ),
+    ]);
 
-    if (event) {
-      const content = JSON.parse(event.content) as NostrYearsEventContent;
-      // Validate version only
-      if (content.version === NOSTR_YEARS_VERSION) {
-        return content;
+    // Merge and deduplicate by event id
+    const eventMap = new Map<string, typeof oldEvents[0]>();
+    for (const event of [...oldEvents, ...newEvents]) {
+      if (!eventMap.has(event.id)) {
+        eventMap.set(event.id, event);
       }
     }
+
+    const contents: NostrYearsEventContent[] = [];
+    for (const event of eventMap.values()) {
+      try {
+        const content = JSON.parse(event.content) as NostrYearsEventContent;
+        if (content.version && content.period) {
+          contents.push(content);
+        }
+      } catch {
+        // Invalid JSON, skip
+      }
+    }
+    return contents;
   } catch (error) {
-    console.error('Error fetching own NostrYears event:', error);
+    console.error('Error fetching own NostrYears events:', error);
   }
   
-  return null;
+  return [];
 }
 
 /**
@@ -201,15 +247,28 @@ function arraysEqual(a: string[], b: string[]): boolean {
 }
 
 /**
- * Fetch user's own NostrYears event with matching relays and version
+ * Fetch user's own NostrYears event with matching relays, period, and version
  */
 export async function fetchOwnNostrYearsEventWithRelays(
   pubkey: string,
-  relays: string[]
+  relays: string[],
+  periodSince?: number,
+  periodUntil?: number
 ): Promise<NostrYearsEventContent | null> {
-  const content = await fetchOwnNostrYearsEvent(pubkey, relays);
+  const contents = await fetchOwnNostrYearsEvents(pubkey, relays);
   
-  if (content && content.relays && arraysEqual(content.relays, relays)) {
+  // Find matching event with same relays, version, and optionally period
+  for (const content of contents) {
+    if (content.version !== NOSTR_YEARS_VERSION) continue;
+    if (!content.relays || !arraysEqual(content.relays, relays)) continue;
+    
+    // If period is specified, also check period match
+    if (periodSince !== undefined && periodUntil !== undefined) {
+      if (content.period.since !== periodSince || content.period.until !== periodUntil) {
+        continue;
+      }
+    }
+    
     return content;
   }
   
@@ -225,6 +284,7 @@ export interface RecentNostrYearsResult {
 
 /**
  * Fetch recent NostrYears events from relays
+ * Fetches both old format (d-tag only) and new format (t-tag) for compatibility
  */
 export async function fetchRecentNostrYearsEvents(
   relays: string[] = DEFAULT_RELAYS,
@@ -233,20 +293,35 @@ export async function fetchRecentNostrYearsEvents(
   const fetcher = initFetcher();
   
   try {
-    const events = await fetcher.fetchAllEvents(
-      relays,
-      { 
-        kinds: [NOSTR_YEARS_KIND],
-        '#d': [NOSTR_YEARS_D_TAG],
-      },
-      {},
-      { sort: true }
-    );
+    // Fetch both old format (d-tag) and new format (t-tag) in parallel
+    const [oldEvents, newEvents] = await Promise.all([
+      fetcher.fetchAllEvents(
+        relays,
+        { kinds: [NOSTR_YEARS_KIND], '#d': ['nostr-years-2025'] },
+        {},
+        { sort: true }
+      ),
+      fetcher.fetchAllEvents(
+        relays,
+        { kinds: [NOSTR_YEARS_KIND], '#t': ['nostryears'] },
+        {},
+        { sort: true }
+      ),
+    ]);
+
+    // Merge and deduplicate by event id, then sort by created_at
+    const eventMap = new Map<string, typeof oldEvents[0]>();
+    for (const event of [...oldEvents, ...newEvents]) {
+      if (!eventMap.has(event.id)) {
+        eventMap.set(event.id, event);
+      }
+    }
+    const allEvents = Array.from(eventMap.values()).sort((a, b) => b.created_at - a.created_at);
 
     const results: RecentNostrYearsResult[] = [];
     const seenPubkeys = new Set<string>();
     
-    for (const event of events) {
+    for (const event of allEvents) {
       // Skip if we already have a result from this pubkey (keep most recent)
       if (seenPubkeys.has(event.pubkey)) continue;
       
@@ -268,7 +343,7 @@ export async function fetchRecentNostrYearsEvents(
       }
     }
     
-    // Sort by createdAt descending
+    // Already sorted, but ensure order
     return results.sort((a, b) => b.createdAt - a.createdAt);
   } catch (error) {
     console.error('Error fetching recent NostrYears events:', error);

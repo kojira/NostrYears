@@ -41,12 +41,7 @@ export function useNostrStats(): UseNostrStatsReturn {
       // First, check for existing published stats with same relay config (unless forced)
       let existingStats = null;
       if (!shouldSkipCache) {
-        existingStats = await fetchOwnNostrYearsEventWithRelays(pubkey, relays);
-        // Also check if the period matches
-        if (existingStats && 
-            (existingStats.period.since !== periodSince || existingStats.period.until !== periodUntil)) {
-          existingStats = null;
-        }
+        existingStats = await fetchOwnNostrYearsEventWithRelays(pubkey, relays, periodSince, periodUntil);
       }
       
       if (existingStats) {
