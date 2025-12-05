@@ -10,13 +10,15 @@ import {
 import { nip19 } from 'nostr-tools';
 import type { NostrEvent } from 'nostr-fetch';
 import { fetchEventById } from '../services/nostrFetcher';
+import { extractImageUrls } from '../utils/textAnalysis';
 
 interface TopPostProps {
   eventId: string | null;
   reactionCount: number;
+  relays: string[];
 }
 
-export function TopPost({ eventId, reactionCount }: TopPostProps) {
+export function TopPost({ eventId, reactionCount, relays }: TopPostProps) {
   const [event, setEvent] = useState<NostrEvent | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -27,17 +29,28 @@ export function TopPost({ eventId, reactionCount }: TopPostProps) {
         return;
       }
       
-      const fetchedEvent = await fetchEventById(eventId);
+      const fetchedEvent = await fetchEventById(eventId, relays);
       setEvent(fetchedEvent);
       setLoading(false);
     };
     
     loadEvent();
-  }, [eventId]);
+  }, [eventId, relays]);
 
-  const formatContent = (content: string, maxLength: number = 280): string => {
-    if (content.length <= maxLength) return content;
-    return content.slice(0, maxLength) + '...';
+  const formatContent = (content: string): string => {
+    // Remove image URLs from display text
+    let text = content;
+    const imageUrls = extractImageUrls(content);
+    for (const url of imageUrls) {
+      text = text.replace(url, '');
+    }
+    // Trim and limit length
+    text = text.trim();
+    const maxLength = 280;
+    if (text.length > maxLength) {
+      text = text.slice(0, maxLength) + '...';
+    }
+    return text;
   };
 
   const getNostrLink = (id: string): string => {
@@ -48,6 +61,8 @@ export function TopPost({ eventId, reactionCount }: TopPostProps) {
       return `https://njump.me/${id}`;
     }
   };
+
+  const imageUrls = event ? extractImageUrls(event.content) : [];
 
   if (!eventId) {
     return (
@@ -112,10 +127,66 @@ export function TopPost({ eventId, reactionCount }: TopPostProps) {
                 sx={{
                   whiteSpace: 'pre-wrap',
                   wordBreak: 'break-word',
+                  mb: imageUrls.length > 0 ? 2 : 0,
                 }}
               >
                 {formatContent(event.content)}
               </Typography>
+              
+              {/* Inline images */}
+              {imageUrls.length > 0 && (
+                <Box
+                  sx={{
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    gap: 1,
+                    mt: 2,
+                  }}
+                >
+                  {imageUrls.slice(0, 4).map((url, index) => (
+                    <Box
+                      key={index}
+                      component="a"
+                      href={url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      sx={{
+                        display: 'block',
+                        flex: imageUrls.length === 1 ? '1 1 100%' : '1 1 calc(50% - 4px)',
+                        maxWidth: imageUrls.length === 1 ? '100%' : 'calc(50% - 4px)',
+                        borderRadius: 1,
+                        overflow: 'hidden',
+                      }}
+                    >
+                      <Box
+                        component="img"
+                        src={url}
+                        alt={`投稿画像 ${index + 1}`}
+                        sx={{
+                          width: '100%',
+                          height: 'auto',
+                          maxHeight: imageUrls.length === 1 ? 300 : 150,
+                          objectFit: 'cover',
+                          display: 'block',
+                          borderRadius: 1,
+                          transition: 'transform 0.2s',
+                          '&:hover': {
+                            transform: 'scale(1.02)',
+                          },
+                        }}
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = 'none';
+                        }}
+                      />
+                    </Box>
+                  ))}
+                  {imageUrls.length > 4 && (
+                    <Typography variant="caption" sx={{ color: 'text.secondary', width: '100%' }}>
+                      +{imageUrls.length - 4} 枚の画像
+                    </Typography>
+                  )}
+                </Box>
+              )}
             </Box>
             
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -148,4 +219,3 @@ export function TopPost({ eventId, reactionCount }: TopPostProps) {
     </Card>
   );
 }
-

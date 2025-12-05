@@ -27,6 +27,8 @@ export interface SignedEvent extends UnsignedEvent {
 // NostrYears statistics
 export interface NostrYearsStats {
   pubkey: string;
+  profile: NostrProfile | null;
+  relays: string[];
   period: {
     since: number;
     until: number;
@@ -55,6 +57,7 @@ export interface FriendScore {
 
 // kind 30078 event content structure
 export interface NostrYearsEventContent {
+  relays: string[];
   period: {
     since: number;
     until: number;

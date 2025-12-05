@@ -30,6 +30,12 @@ export function calculateFriendScores(data: InteractionData): FriendScore[] {
     const incomingReactions = data.incomingReactions.get(pubkey) || 0;
     const incomingReplies = data.incomingReplies.get(pubkey) || 0;
 
+    // Skip if there's no bidirectional reaction interaction
+    // Either outgoing or incoming reactions must be > 0
+    if (outgoingReactions === 0 && incomingReactions === 0) {
+      continue;
+    }
+
     const score = 
       (outgoingReactions * REACTION_WEIGHT) +
       (outgoingReplies * REPLY_WEIGHT) +

@@ -68,8 +68,19 @@ export async function fetchNostrYearsStats(
 ): Promise<NostrYearsStats> {
   const f = initFetcher();
   
+  // Fetch user profile first
+  onProgress?.({
+    phase: 'fetching_own',
+    message: 'プロフィールを取得中...',
+    progress: 5,
+  });
+  
+  const profile = await fetchProfile(pubkey, relays);
+  
   const stats: NostrYearsStats = {
     pubkey,
+    profile,
+    relays: [...relays],
     period: { since: PERIOD_SINCE, until: PERIOD_UNTIL },
     kind1Count: 0,
     kind1Chars: 0,

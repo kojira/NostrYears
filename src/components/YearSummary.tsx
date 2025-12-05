@@ -6,7 +6,11 @@ import {
   Button,
   Alert,
   Snackbar,
+  Avatar,
+  Chip,
+  Paper,
 } from '@mui/material';
+import { nip19 } from 'nostr-tools';
 import { StatsCard } from './StatsCard';
 import { FriendsRanking } from './FriendsRanking';
 import { TopPost } from './TopPost';
@@ -21,6 +25,7 @@ interface YearSummaryProps {
 
 export function YearSummary({ stats, onReset }: YearSummaryProps) {
   const [percentiles, setPercentiles] = useState<PercentileData | null>(null);
+  const [percentileCount, setPercentileCount] = useState(0);
   const [publishing, setPublishing] = useState(false);
   const [published, setPublished] = useState(false);
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
@@ -31,10 +36,21 @@ export function YearSummary({ stats, onReset }: YearSummaryProps) {
 
   useEffect(() => {
     const loadPercentiles = async () => {
-      const allStats = await fetchAllNostrYearsEvents();
-      if (allStats.length > 0) {
+      // Use the same relays for percentile calculation
+      const allStats = await fetchAllNostrYearsEvents(stats.relays);
+      
+      // Filter to only include stats from the same relays
+      const sameRelayStats = allStats.filter(s => 
+        s.relays && 
+        s.relays.length === stats.relays.length &&
+        s.relays.every(r => stats.relays.includes(r))
+      );
+      
+      setPercentileCount(sameRelayStats.length);
+      
+      if (sameRelayStats.length > 0) {
         const myContent = createEventContent(stats);
-        const calculated = calculateAllPercentiles(myContent, allStats);
+        const calculated = calculateAllPercentiles(myContent, sameRelayStats);
         setPercentiles(calculated);
       }
     };
@@ -44,7 +60,7 @@ export function YearSummary({ stats, onReset }: YearSummaryProps) {
 
   const handlePublish = async () => {
     setPublishing(true);
-    const success = await publishNostrYearsStats(stats);
+    const success = await publishNostrYearsStats(stats, stats.relays);
     setPublishing(false);
     
     if (success) {
@@ -56,10 +72,17 @@ export function YearSummary({ stats, onReset }: YearSummaryProps) {
       });
       
       // Reload percentiles after publishing
-      const allStats = await fetchAllNostrYearsEvents();
-      if (allStats.length > 0) {
+      const allStats = await fetchAllNostrYearsEvents(stats.relays);
+      const sameRelayStats = allStats.filter(s => 
+        s.relays && 
+        s.relays.length === stats.relays.length &&
+        s.relays.every(r => stats.relays.includes(r))
+      );
+      setPercentileCount(sameRelayStats.length);
+      
+      if (sameRelayStats.length > 0) {
         const myContent = createEventContent(stats);
-        const calculated = calculateAllPercentiles(myContent, allStats);
+        const calculated = calculateAllPercentiles(myContent, sameRelayStats);
         setPercentiles(calculated);
       }
     } else {
@@ -71,15 +94,84 @@ export function YearSummary({ stats, onReset }: YearSummaryProps) {
     }
   };
 
+  const getDisplayName = (): string => {
+    if (stats.profile?.display_name) return stats.profile.display_name;
+    if (stats.profile?.name) return stats.profile.name;
+    try {
+      const npub = nip19.npubEncode(stats.pubkey);
+      return `${npub.slice(0, 12)}...${npub.slice(-8)}`;
+    } catch {
+      return `${stats.pubkey.slice(0, 8)}...`;
+    }
+  };
+
   return (
     <Box sx={{ p: 4, maxWidth: 1200, mx: 'auto' }}>
       <Box sx={{ textAlign: 'center', mb: 4 }}>
-        <Typography variant="h1" sx={{ mb: 2 }}>
+        <Typography variant="h1" sx={{ mb: 3 }}>
           NostrYears 2025
         </Typography>
-        <Typography variant="h6" sx={{ color: 'text.secondary', mb: 3 }}>
-          あなたの2025年のNostr活動まとめ
-        </Typography>
+        
+        {/* User Profile Section */}
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: 2,
+            mb: 3,
+          }}
+        >
+          <Avatar
+            src={stats.profile?.picture}
+            sx={{
+              width: 100,
+              height: 100,
+              border: '4px solid',
+              borderColor: 'primary.main',
+              boxShadow: '0 4px 20px rgba(156, 39, 176, 0.4)',
+            }}
+          >
+            {getDisplayName().charAt(0).toUpperCase()}
+          </Avatar>
+          <Typography variant="h5" sx={{ fontWeight: 600 }}>
+            {getDisplayName()}
+          </Typography>
+          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+            の2025年のNostr活動まとめ
+          </Typography>
+        </Box>
+        
+        {/* Relay Info */}
+        <Paper
+          sx={{
+            display: 'inline-block',
+            p: 1.5,
+            px: 2,
+            mb: 3,
+            backgroundColor: 'rgba(255,255,255,0.05)',
+            borderRadius: 2,
+          }}
+        >
+          <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mb: 1 }}>
+            使用リレー:
+          </Typography>
+          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', justifyContent: 'center' }}>
+            {stats.relays.map((relay) => (
+              <Chip
+                key={relay}
+                label={relay.replace('wss://', '')}
+                size="small"
+                sx={{ backgroundColor: 'rgba(156, 39, 176, 0.2)' }}
+              />
+            ))}
+          </Box>
+          {percentileCount > 0 && (
+            <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mt: 1 }}>
+              同じリレーで集計した {percentileCount} 人のユーザーと比較
+            </Typography>
+          )}
+        </Paper>
         
         <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2, flexWrap: 'wrap' }}>
           <Button
@@ -198,12 +290,13 @@ export function YearSummary({ stats, onReset }: YearSummaryProps) {
           <TopPost
             eventId={stats.topPostId}
             reactionCount={stats.topPostReactionCount}
+            relays={stats.relays}
           />
         </Grid>
 
         {/* Friends Ranking */}
         <Grid size={{ xs: 12, md: 6 }}>
-          <FriendsRanking friends={stats.friendsRanking} />
+          <FriendsRanking friends={stats.friendsRanking} relays={stats.relays} />
         </Grid>
 
         {/* Long article stats */}
@@ -232,4 +325,3 @@ export function YearSummary({ stats, onReset }: YearSummaryProps) {
     </Box>
   );
 }
-

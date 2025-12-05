@@ -18,9 +18,10 @@ import { fetchProfiles } from '../services/nostrFetcher';
 
 interface FriendsRankingProps {
   friends: FriendScore[];
+  relays: string[];
 }
 
-export function FriendsRanking({ friends }: FriendsRankingProps) {
+export function FriendsRanking({ friends, relays }: FriendsRankingProps) {
   const [profiles, setProfiles] = useState<Map<string, NostrProfile>>(new Map());
   const [loading, setLoading] = useState(true);
 
@@ -32,13 +33,13 @@ export function FriendsRanking({ friends }: FriendsRankingProps) {
       }
       
       const pubkeys = friends.map(f => f.pubkey);
-      const fetchedProfiles = await fetchProfiles(pubkeys);
+      const fetchedProfiles = await fetchProfiles(pubkeys, relays);
       setProfiles(fetchedProfiles);
       setLoading(false);
     };
     
     loadProfiles();
-  }, [friends]);
+  }, [friends, relays]);
 
   const getDisplayName = (pubkey: string): string => {
     const profile = profiles.get(pubkey);

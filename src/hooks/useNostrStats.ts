@@ -7,7 +7,7 @@ interface UseNostrStatsReturn {
   isLoading: boolean;
   progress: FetchProgress | null;
   error: string | null;
-  fetchStats: (pubkey: string) => Promise<void>;
+  fetchStats: (pubkey: string, relays: string[]) => Promise<void>;
   reset: () => void;
 }
 
@@ -17,13 +17,13 @@ export function useNostrStats(): UseNostrStatsReturn {
   const [progress, setProgress] = useState<FetchProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchStats = useCallback(async (pubkey: string) => {
+  const fetchStats = useCallback(async (pubkey: string, relays: string[]) => {
     setIsLoading(true);
     setError(null);
     setProgress({ phase: 'idle', message: '準備中...', progress: 0 });
 
     try {
-      const fetchedStats = await fetchNostrYearsStats(pubkey, undefined, setProgress);
+      const fetchedStats = await fetchNostrYearsStats(pubkey, relays, setProgress);
       setStats(fetchedStats);
     } catch (err) {
       console.error('Error fetching stats:', err);
@@ -49,4 +49,3 @@ export function useNostrStats(): UseNostrStatsReturn {
     reset,
   };
 }
-

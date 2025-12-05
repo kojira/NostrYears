@@ -10,16 +10,19 @@ import {
 } from '@mui/material';
 import { nip19 } from 'nostr-tools';
 import { hasNip07, getPubkeyFromNip07 } from '../services/nostrPublisher';
+import { DEFAULT_RELAYS } from '../services/nostrFetcher';
+import { RelaySettings } from './RelaySettings';
 import type { FetchProgress } from '../types/nostr';
 
 interface InputFormProps {
-  onSubmit: (pubkey: string) => void;
+  onSubmit: (pubkey: string, relays: string[]) => void;
   isLoading: boolean;
   progress: FetchProgress | null;
 }
 
 export function InputForm({ onSubmit, isLoading, progress }: InputFormProps) {
   const [npubInput, setNpubInput] = useState('');
+  const [relays, setRelays] = useState<string[]>([...DEFAULT_RELAYS]);
   const [error, setError] = useState<string | null>(null);
   const [hasExtension, setHasExtension] = useState(false);
 
@@ -33,6 +36,11 @@ export function InputForm({ onSubmit, isLoading, progress }: InputFormProps) {
 
   const validateAndSubmit = (pubkeyOrNpub: string) => {
     setError(null);
+    
+    if (relays.length === 0) {
+      setError('少なくとも1つのリレーを選択してください');
+      return;
+    }
     
     let pubkey = pubkeyOrNpub;
     
@@ -57,7 +65,7 @@ export function InputForm({ onSubmit, isLoading, progress }: InputFormProps) {
       return;
     }
     
-    onSubmit(pubkey.toLowerCase());
+    onSubmit(pubkey.toLowerCase(), relays);
   };
 
   const handleNpubSubmit = () => {
@@ -109,7 +117,7 @@ export function InputForm({ onSubmit, isLoading, progress }: InputFormProps) {
         2025年のNostr活動を振り返ろう
       </Typography>
 
-      <Stack spacing={2} sx={{ width: '100%', maxWidth: 400 }}>
+      <Stack spacing={2} sx={{ width: '100%', maxWidth: 400, alignItems: 'center' }}>
         <TextField
           fullWidth
           label="npub または 公開鍵 (hex)"
@@ -124,11 +132,18 @@ export function InputForm({ onSubmit, isLoading, progress }: InputFormProps) {
           }}
         />
         
+        <RelaySettings
+          relays={relays}
+          onRelaysChange={setRelays}
+          disabled={isLoading}
+        />
+        
         <Button
+          fullWidth
           variant="contained"
           size="large"
           onClick={handleNpubSubmit}
-          disabled={isLoading || !npubInput.trim()}
+          disabled={isLoading || !npubInput.trim() || relays.length === 0}
           sx={{
             background: 'linear-gradient(45deg, #9c27b0, #ff4081)',
             '&:hover': {
@@ -149,10 +164,11 @@ export function InputForm({ onSubmit, isLoading, progress }: InputFormProps) {
             </Typography>
             
             <Button
+              fullWidth
               variant="outlined"
               size="large"
               onClick={handleNip07}
-              disabled={isLoading}
+              disabled={isLoading || relays.length === 0}
               sx={{
                 borderColor: '#9c27b0',
                 color: '#ba68c8',
@@ -168,13 +184,13 @@ export function InputForm({ onSubmit, isLoading, progress }: InputFormProps) {
         )}
 
         {error && (
-          <Alert severity="error" sx={{ mt: 2 }}>
+          <Alert severity="error" sx={{ mt: 2, width: '100%' }}>
             {error}
           </Alert>
         )}
 
         {isLoading && progress && (
-          <Box sx={{ mt: 3 }}>
+          <Box sx={{ mt: 3, width: '100%' }}>
             <Typography variant="body2" sx={{ mb: 1, color: 'text.secondary' }}>
               {progress.message}
             </Typography>
@@ -212,4 +228,3 @@ export function InputForm({ onSubmit, isLoading, progress }: InputFormProps) {
     </Box>
   );
 }
-

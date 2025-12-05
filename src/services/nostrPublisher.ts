@@ -31,6 +31,7 @@ export async function getPubkeyFromNip07(): Promise<string | null> {
  */
 export function createEventContent(stats: NostrYearsStats): NostrYearsEventContent {
   return {
+    relays: stats.relays,
     period: stats.period,
     kind1Count: stats.kind1Count,
     kind1Chars: stats.kind1Chars,
