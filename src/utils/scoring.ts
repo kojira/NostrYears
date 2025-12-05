@@ -1,9 +1,5 @@
 import type { FriendScore } from '../types/nostr';
 
-// Weight for replies (2x compared to reactions)
-const REPLY_WEIGHT = 2;
-const REACTION_WEIGHT = 1;
-
 interface InteractionData {
   outgoingReactions: Map<string, number>; // pubkey -> count
   outgoingReplies: Map<string, number>;   // pubkey -> count
@@ -12,7 +8,29 @@ interface InteractionData {
 }
 
 /**
+ * Calculate balance score (0-1)
+ * Higher score means more balanced interaction (closer to 50% each direction)
+ * 
+ * Formula: 1 - |outgoing - incoming| / total
+ * - 50/50 split = 1.0 (perfect balance)
+ * - 100/0 or 0/100 = 0.0 (no balance)
+ */
+function calculateBalanceScore(outgoing: number, incoming: number): number {
+  const total = outgoing + incoming;
+  if (total === 0) return 0;
+  
+  const diff = Math.abs(outgoing - incoming);
+  return 1 - (diff / total);
+}
+
+/**
  * Calculate friend scores from interaction data
+ * 
+ * Ranking criteria:
+ * 1. Primary sort: Number of reactions sent by me (outgoingReactions) - descending
+ * 2. Secondary: Balance score (how close to 50/50 the interaction is) - descending
+ * 
+ * Filter: Must have outgoing reactions > 0 (I must have reacted to them)
  */
 export function calculateFriendScores(data: InteractionData): FriendScore[] {
   const allPubkeys = new Set<string>([
@@ -30,32 +48,35 @@ export function calculateFriendScores(data: InteractionData): FriendScore[] {
     const incomingReactions = data.incomingReactions.get(pubkey) || 0;
     const incomingReplies = data.incomingReplies.get(pubkey) || 0;
 
-    // Skip if there's no bidirectional reaction interaction
-    // Either outgoing or incoming reactions must be > 0
-    if (outgoingReactions === 0 && incomingReactions === 0) {
+    // Must have sent at least one reaction to this person
+    if (outgoingReactions === 0) {
       continue;
     }
 
-    const score = 
-      (outgoingReactions * REACTION_WEIGHT) +
-      (outgoingReplies * REPLY_WEIGHT) +
-      (incomingReactions * REACTION_WEIGHT) +
-      (incomingReplies * REPLY_WEIGHT);
+    // Calculate balance score based on all interactions
+    const totalOutgoing = outgoingReactions + outgoingReplies;
+    const totalIncoming = incomingReactions + incomingReplies;
+    const balanceScore = calculateBalanceScore(totalOutgoing, totalIncoming);
 
-    if (score > 0) {
-      scores.push({
-        pubkey,
-        score,
-        outgoingReactions,
-        outgoingReplies,
-        incomingReactions,
-        incomingReplies,
-      });
-    }
+    scores.push({
+      pubkey,
+      outgoingReactions,
+      outgoingReplies,
+      incomingReactions,
+      incomingReplies,
+      balanceScore,
+    });
   }
 
-  // Sort by score descending
-  return scores.sort((a, b) => b.score - a.score);
+  // Sort by:
+  // 1. outgoingReactions descending (primary)
+  // 2. balanceScore descending (secondary - closer to 50% is better)
+  return scores.sort((a, b) => {
+    if (b.outgoingReactions !== a.outgoingReactions) {
+      return b.outgoingReactions - a.outgoingReactions;
+    }
+    return b.balanceScore - a.balanceScore;
+  });
 }
 
 /**
@@ -64,4 +85,3 @@ export function calculateFriendScores(data: InteractionData): FriendScore[] {
 export function addToCountMap(map: Map<string, number>, key: string, count: number = 1): void {
   map.set(key, (map.get(key) || 0) + count);
 }
-

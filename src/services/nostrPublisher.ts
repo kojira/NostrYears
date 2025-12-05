@@ -1,5 +1,6 @@
 import { Relay } from 'nostr-tools';
 import type { NostrYearsStats, NostrYearsEventContent, UnsignedEvent } from '../types/nostr';
+import { NOSTR_YEARS_VERSION } from '../types/nostr';
 import { DEFAULT_RELAYS, PERIOD_SINCE, PERIOD_UNTIL, initFetcher } from './nostrFetcher';
 
 const NOSTR_YEARS_D_TAG = 'nostr-years-2025';
@@ -31,6 +32,7 @@ export async function getPubkeyFromNip07(): Promise<string | null> {
  */
 export function createEventContent(stats: NostrYearsStats): NostrYearsEventContent {
   return {
+    version: NOSTR_YEARS_VERSION,
     relays: stats.relays,
     period: stats.period,
     kind1Count: stats.kind1Count,
@@ -65,7 +67,7 @@ export async function publishNostrYearsStats(
     created_at: Math.floor(Date.now() / 1000),
     tags: [
       ['d', NOSTR_YEARS_D_TAG],
-      ['version', '1'],
+      ['version', String(NOSTR_YEARS_VERSION)],
     ],
     content: JSON.stringify(content),
   };
@@ -97,6 +99,7 @@ export async function publishNostrYearsStats(
 
 /**
  * Fetch all NostrYears events from relays (for percentile calculation)
+ * Only returns events with matching version
  */
 export async function fetchAllNostrYearsEvents(
   relays: string[] = DEFAULT_RELAYS
@@ -118,8 +121,12 @@ export async function fetchAllNostrYearsEvents(
     for (const event of events) {
       try {
         const content = JSON.parse(event.content) as NostrYearsEventContent;
-        // Validate that it's for the correct period
-        if (content.period?.since === PERIOD_SINCE && content.period?.until === PERIOD_UNTIL) {
+        // Validate period and version
+        if (
+          content.period?.since === PERIOD_SINCE && 
+          content.period?.until === PERIOD_UNTIL &&
+          content.version === NOSTR_YEARS_VERSION
+        ) {
           contents.push(content);
         }
       } catch {
@@ -155,7 +162,12 @@ export async function fetchOwnNostrYearsEvent(
 
     if (event) {
       const content = JSON.parse(event.content) as NostrYearsEventContent;
-      if (content.period?.since === PERIOD_SINCE && content.period?.until === PERIOD_UNTIL) {
+      // Validate period and version
+      if (
+        content.period?.since === PERIOD_SINCE && 
+        content.period?.until === PERIOD_UNTIL &&
+        content.version === NOSTR_YEARS_VERSION
+      ) {
         return content;
       }
     }
@@ -177,7 +189,7 @@ function arraysEqual(a: string[], b: string[]): boolean {
 }
 
 /**
- * Fetch user's own NostrYears event with matching relays
+ * Fetch user's own NostrYears event with matching relays and version
  */
 export async function fetchOwnNostrYearsEventWithRelays(
   pubkey: string,
@@ -191,4 +203,3 @@ export async function fetchOwnNostrYearsEventWithRelays(
   
   return null;
 }
-

@@ -48,15 +48,19 @@ export interface NostrYearsStats {
 
 export interface FriendScore {
   pubkey: string;
-  score: number;
   outgoingReactions: number;
   outgoingReplies: number;
   incomingReactions: number;
   incomingReplies: number;
+  balanceScore: number; // 0-1, higher is more balanced (50% each direction)
 }
+
+// App version for cache invalidation
+export const NOSTR_YEARS_VERSION = 2;
 
 // kind 30078 event content structure
 export interface NostrYearsEventContent {
+  version: number;
   relays: string[];
   period: {
     since: number;

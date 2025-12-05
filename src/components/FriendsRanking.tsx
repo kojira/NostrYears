@@ -11,6 +11,7 @@ import {
   ListItemText,
   Chip,
   Skeleton,
+  LinearProgress,
 } from '@mui/material';
 import { nip19 } from 'nostr-tools';
 import type { FriendScore, NostrProfile } from '../types/nostr';
@@ -80,11 +81,28 @@ export function FriendsRanking({ friends, relays }: FriendsRankingProps) {
     );
   };
 
+  const getBalanceLabel = (balance: number): string => {
+    if (balance >= 0.9) return '最高';
+    if (balance >= 0.7) return '良好';
+    if (balance >= 0.5) return '普通';
+    return '片思い';
+  };
+
+  const getBalanceColor = (balance: number): string => {
+    if (balance >= 0.9) return '#4caf50';
+    if (balance >= 0.7) return '#8bc34a';
+    if (balance >= 0.5) return '#ff9800';
+    return '#f44336';
+  };
+
   return (
     <Card sx={{ height: '100%' }}>
       <CardContent sx={{ p: 3 }}>
-        <Typography variant="h5" sx={{ mb: 3, fontWeight: 600 }}>
+        <Typography variant="h5" sx={{ mb: 1, fontWeight: 600 }}>
           🤝 仲良しランキング TOP10
+        </Typography>
+        <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mb: 2 }}>
+          あなたがリアクションを送った相手（バランスが良いほど相思相愛）
         </Typography>
         
         {friends.length === 0 ? (
@@ -134,18 +152,46 @@ export function FriendsRanking({ friends, relays }: FriendsRankingProps) {
                     )
                   }
                   secondary={
-                    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mt: 0.5 }}>
-                      <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                        送信: リアクション{friend.outgoingReactions} / リプライ{friend.outgoingReplies}
-                      </Typography>
-                      <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                        受信: リアクション{friend.incomingReactions} / リプライ{friend.incomingReplies}
-                      </Typography>
+                    <Box sx={{ mt: 0.5 }}>
+                      <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 0.5 }}>
+                        <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                          → {friend.outgoingReactions}❤️ {friend.outgoingReplies}💬
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                          ← {friend.incomingReactions}❤️ {friend.incomingReplies}💬
+                        </Typography>
+                      </Box>
+                      {/* Balance indicator */}
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <LinearProgress
+                          variant="determinate"
+                          value={friend.balanceScore * 100}
+                          sx={{
+                            width: 60,
+                            height: 4,
+                            borderRadius: 2,
+                            backgroundColor: 'rgba(255,255,255,0.1)',
+                            '& .MuiLinearProgress-bar': {
+                              backgroundColor: getBalanceColor(friend.balanceScore),
+                              borderRadius: 2,
+                            },
+                          }}
+                        />
+                        <Typography 
+                          variant="caption" 
+                          sx={{ 
+                            color: getBalanceColor(friend.balanceScore),
+                            fontSize: '0.65rem',
+                          }}
+                        >
+                          {getBalanceLabel(friend.balanceScore)}
+                        </Typography>
+                      </Box>
                     </Box>
                   }
                 />
                 
-                <Box sx={{ textAlign: 'right' }}>
+                <Box sx={{ textAlign: 'right', minWidth: 50 }}>
                   <Typography
                     variant="h6"
                     sx={{
@@ -156,10 +202,10 @@ export function FriendsRanking({ friends, relays }: FriendsRankingProps) {
                       WebkitTextFillColor: 'transparent',
                     }}
                   >
-                    {friend.score}
+                    {friend.outgoingReactions}
                   </Typography>
-                  <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                    スコア
+                  <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.65rem' }}>
+                    送った❤️
                   </Typography>
                 </Box>
               </ListItem>
@@ -170,4 +216,3 @@ export function FriendsRanking({ friends, relays }: FriendsRankingProps) {
     </Card>
   );
 }
-
