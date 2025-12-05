@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
-import type { NostrYearsStats, FetchProgress } from '../types/nostr';
-import { fetchNostrYearsStats, shutdownFetcher, fetchProfile } from '../services/nostrFetcher';
+import type { NostrYearsStats, FetchProgress, NostrYearsEventContent, NostrProfile } from '../types/nostr';
+import { fetchNostrYearsStats, shutdownFetcher, fetchProfile, DEFAULT_RELAYS } from '../services/nostrFetcher';
 import { fetchOwnNostrYearsEventWithRelays } from '../services/nostrPublisher';
 
 interface UseNostrStatsReturn {
@@ -10,6 +10,7 @@ interface UseNostrStatsReturn {
   error: string | null;
   isFromCache: boolean;
   fetchStats: (pubkey: string, relays: string[], periodSince: number, periodUntil: number, force?: boolean) => Promise<void>;
+  setCachedStats: (pubkey: string, content: NostrYearsEventContent, profile: NostrProfile | null) => void;
   reset: () => void;
 }
 
@@ -93,6 +94,39 @@ export function useNostrStats(): UseNostrStatsReturn {
     }
   }, []);
 
+  const setCachedStats = useCallback((
+    pubkey: string,
+    content: NostrYearsEventContent,
+    profile: NostrProfile | null
+  ) => {
+    const cachedStats: NostrYearsStats = {
+      pubkey,
+      profile,
+      relays: content.relays || DEFAULT_RELAYS,
+      period: content.period,
+      kind1Count: content.kind1Count,
+      kind1Chars: content.kind1Chars,
+      kind30023Count: content.kind30023Count,
+      kind30023Chars: content.kind30023Chars,
+      kind6Count: content.kind6Count,
+      kind7Count: content.kind7Count,
+      receivedReactionsCount: content.receivedReactionsCount || 0,
+      kind42Count: content.kind42Count,
+      imageCount: content.imageCount,
+      topPosts: content.topPosts || [],
+      topReactionEmojis: content.topReactionEmojis || [],
+      friendsRanking: [], // Not stored in published event
+      monthlyActivity: content.monthlyActivity || [],
+      zapsReceived: content.zapsReceived || { count: 0, totalSats: 0, averageSats: 0 },
+      zapsSent: content.zapsSent || { count: 0, totalSats: 0, averageSats: 0 },
+    };
+    
+    setStats(cachedStats);
+    setIsFromCache(true);
+    setError(null);
+    setProgress(null);
+  }, []);
+
   const reset = useCallback(() => {
     setStats(null);
     setProgress(null);
@@ -109,6 +143,7 @@ export function useNostrStats(): UseNostrStatsReturn {
     error,
     isFromCache,
     fetchStats,
+    setCachedStats,
     reset,
   };
 }

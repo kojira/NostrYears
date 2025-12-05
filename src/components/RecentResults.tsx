@@ -9,19 +9,22 @@ import {
   Button,
   Chip,
   Link,
+  Tooltip,
 } from '@mui/material';
 import { nip19 } from 'nostr-tools';
 import { fetchRecentNostrYearsEvents } from '../services/nostrPublisher';
 import type { RecentNostrYearsResult } from '../services/nostrPublisher';
 import { fetchProfiles } from '../services/nostrFetcher';
-import type { NostrProfile } from '../types/nostr';
+import type { NostrProfile, NostrYearsEventContent } from '../types/nostr';
+import { NOSTR_YEARS_VERSION } from '../types/nostr';
 
 interface RecentResultsProps {
   relays: string[];
-  onSelectUser: (pubkey: string) => void;
+  onSelectUser?: (pubkey: string) => void;
+  onLoadCachedResult: (pubkey: string, content: NostrYearsEventContent, profile: NostrProfile | null) => void;
 }
 
-export function RecentResults({ relays, onSelectUser }: RecentResultsProps) {
+export function RecentResults({ relays, onLoadCachedResult }: RecentResultsProps) {
   const [results, setResults] = useState<RecentNostrYearsResult[]>([]);
   const [profiles, setProfiles] = useState<Map<string, NostrProfile>>(new Map());
   const [loading, setLoading] = useState(true);
@@ -126,7 +129,7 @@ export function RecentResults({ relays, onSelectUser }: RecentResultsProps) {
                 boxShadow: '0 8px 24px rgba(156, 39, 176, 0.3)',
               },
             }}
-            onClick={() => onSelectUser(result.pubkey)}
+            onClick={() => onLoadCachedResult(result.pubkey, result.content, profiles.get(result.pubkey) || null)}
           >
             <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
@@ -172,6 +175,15 @@ export function RecentResults({ relays, onSelectUser }: RecentResultsProps) {
                   size="small"
                   sx={{ fontSize: '0.65rem', height: 20 }}
                 />
+                {result.content.version !== NOSTR_YEARS_VERSION && (
+                  <Tooltip title={`Version ${result.content.version} (current: ${NOSTR_YEARS_VERSION})`}>
+                    <Chip
+                      label={`v${result.content.version}`}
+                      size="small"
+                      sx={{ fontSize: '0.6rem', height: 18, bgcolor: 'warning.dark' }}
+                    />
+                  </Tooltip>
+                )}
               </Box>
             </CardContent>
           </Card>

@@ -4,9 +4,10 @@ import { theme } from './theme';
 import { InputForm } from './components/InputForm';
 import { YearSummary } from './components/YearSummary';
 import { useNostrStats } from './hooks/useNostrStats';
+import type { NostrYearsEventContent, NostrProfile } from './types/nostr';
 
 function App() {
-  const { stats, isLoading, progress, error, isFromCache, fetchStats, reset } = useNostrStats();
+  const { stats, isLoading, progress, error, isFromCache, fetchStats, setCachedStats, reset } = useNostrStats();
   const [lastPubkey, setLastPubkey] = useState<string | null>(null);
   const [lastRelays, setLastRelays] = useState<string[]>([]);
   const [lastPeriod, setLastPeriod] = useState<{ since: number; until: number } | null>(null);
@@ -27,6 +28,13 @@ function App() {
     }
   }, [lastPubkey, lastRelays, lastPeriod, reset, fetchStats]);
 
+  const handleLoadCachedResult = useCallback((pubkey: string, content: NostrYearsEventContent, profile: NostrProfile | null) => {
+    setLastPubkey(pubkey);
+    setLastRelays(content.relays || []);
+    setLastPeriod(content.period);
+    setCachedStats(pubkey, content, profile);
+  }, [setCachedStats]);
+
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
@@ -41,6 +49,7 @@ function App() {
           <Box sx={{ maxWidth: 600, mx: 'auto', px: 2 }}>
             <InputForm
               onSubmit={handleSubmit}
+              onLoadCachedResult={handleLoadCachedResult}
               isLoading={isLoading}
               progress={progress}
             />

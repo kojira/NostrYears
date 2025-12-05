@@ -15,10 +15,11 @@ import { hasNip07, getPubkeyFromNip07 } from '../services/nostrPublisher';
 import { DEFAULT_RELAYS, fetchProfile } from '../services/nostrFetcher';
 import { RelaySettings } from './RelaySettings';
 import { RecentResults } from './RecentResults';
-import type { FetchProgress, NostrProfile } from '../types/nostr';
+import type { FetchProgress, NostrProfile, NostrYearsEventContent } from '../types/nostr';
 
 interface InputFormProps {
   onSubmit: (pubkey: string, relays: string[], periodSince: number, periodUntil: number) => void;
+  onLoadCachedResult: (pubkey: string, content: NostrYearsEventContent, profile: NostrProfile | null) => void;
   isLoading: boolean;
   progress: FetchProgress | null;
 }
@@ -27,7 +28,7 @@ interface InputFormProps {
 const DEFAULT_SINCE = '2025-01-01';
 const DEFAULT_UNTIL = '2025-12-01';
 
-export function InputForm({ onSubmit, isLoading, progress }: InputFormProps) {
+export function InputForm({ onSubmit, onLoadCachedResult, isLoading, progress }: InputFormProps) {
   const [npubInput, setNpubInput] = useState('');
   const [relays, setRelays] = useState<string[]>([...DEFAULT_RELAYS]);
   const [error, setError] = useState<string | null>(null);
@@ -126,18 +127,6 @@ export function InputForm({ onSubmit, isLoading, progress }: InputFormProps) {
       }
     } else {
       setError('Failed to get public key from NIP-07 extension');
-    }
-  };
-
-  const handleSelectRecentUser = async (pubkey: string) => {
-    try {
-      const npub = nip19.npubEncode(pubkey);
-      setNpubInput(npub);
-      setPreviewPubkey(pubkey);
-      const profile = await fetchProfile(pubkey, relays);
-      setPreviewProfile(profile);
-    } catch {
-      setNpubInput(pubkey);
     }
   };
 
@@ -429,7 +418,7 @@ export function InputForm({ onSubmit, isLoading, progress }: InputFormProps) {
         <Box sx={{ width: '100%', maxWidth: 600 }}>
           <RecentResults
             relays={relays}
-            onSelectUser={handleSelectRecentUser}
+            onLoadCachedResult={onLoadCachedResult}
           />
         </Box>
       )}

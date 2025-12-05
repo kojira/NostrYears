@@ -236,8 +236,8 @@ export async function fetchRecentNostrYearsEvents(
       
       try {
         const content = JSON.parse(event.content) as NostrYearsEventContent;
-        // Validate version
-        if (content.version === NOSTR_YEARS_VERSION) {
+        // Accept any version (show all results)
+        if (content.version) {
           seenPubkeys.add(event.pubkey);
           results.push({
             pubkey: event.pubkey,
