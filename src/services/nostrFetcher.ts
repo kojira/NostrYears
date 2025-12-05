@@ -7,12 +7,10 @@ import { calculateFriendScores, addToCountMap } from '../utils/scoring';
 // Default relays
 export const DEFAULT_RELAYS = ['wss://r.kojira.io', 'wss://yabu.me'];
 
-// Time range: 2025/1/1 0:00:00 JST to 2025/12/1 0:00:00 JST
+// Default time range: 2025/1/1 0:00:00 JST to 2025/12/1 0:00:00 JST
 // JST = UTC + 9 hours
-// 2025/1/1 0:00:00 JST = 2024/12/31 15:00:00 UTC
-// 2025/12/1 0:00:00 JST = 2025/11/30 15:00:00 UTC
-export const PERIOD_SINCE = Math.floor(new Date('2024-12-31T15:00:00Z').getTime() / 1000);
-export const PERIOD_UNTIL = Math.floor(new Date('2025-11-30T15:00:00Z').getTime() / 1000);
+export const DEFAULT_PERIOD_SINCE = Math.floor(new Date('2024-12-31T15:00:00Z').getTime() / 1000);
+export const DEFAULT_PERIOD_UNTIL = Math.floor(new Date('2025-11-30T15:00:00Z').getTime() / 1000);
 
 let fetcher: NostrFetcher | null = null;
 
@@ -64,6 +62,8 @@ export async function fetchProfile(pubkey: string, relays: string[] = DEFAULT_RE
 export async function fetchNostrYearsStats(
   pubkey: string,
   relays: string[] = DEFAULT_RELAYS,
+  periodSince: number = DEFAULT_PERIOD_SINCE,
+  periodUntil: number = DEFAULT_PERIOD_UNTIL,
   onProgress?: (progress: FetchProgress) => void
 ): Promise<NostrYearsStats> {
   const f = initFetcher();
@@ -71,7 +71,7 @@ export async function fetchNostrYearsStats(
   // Fetch user profile first
   onProgress?.({
     phase: 'fetching_own',
-    message: 'プロフィールを取得中...',
+    message: 'Fetching profile...',
     progress: 5,
   });
   
@@ -81,7 +81,7 @@ export async function fetchNostrYearsStats(
     pubkey,
     profile,
     relays: [...relays],
-    period: { since: PERIOD_SINCE, until: PERIOD_UNTIL },
+    period: { since: periodSince, until: periodUntil },
     kind1Count: 0,
     kind1Chars: 0,
     kind30023Count: 0,
@@ -111,7 +111,7 @@ export async function fetchNostrYearsStats(
   // Phase 1: Fetch own events
   onProgress?.({
     phase: 'fetching_own',
-    message: '自分の投稿を取得中...',
+    message: 'Fetching your posts...',
     progress: 10,
   });
 
@@ -119,7 +119,7 @@ export async function fetchNostrYearsStats(
   const ownEvents = await f.fetchAllEvents(
     relays,
     { kinds: [1, 6, 7, 42, 30023], authors: [pubkey] },
-    { since: PERIOD_SINCE, until: PERIOD_UNTIL },
+    { since: periodSince, until: periodUntil },
     { sort: true }
   );
 
@@ -173,7 +173,7 @@ export async function fetchNostrYearsStats(
 
   onProgress?.({
     phase: 'fetching_reactions',
-    message: '自分への反応を取得中...',
+    message: 'Fetching reactions to your posts...',
     progress: 40,
   });
 
@@ -185,7 +185,7 @@ export async function fetchNostrYearsStats(
     const reactions = await f.fetchAllEvents(
       relays,
       { kinds: [7], '#e': batch },
-      { since: PERIOD_SINCE, until: PERIOD_UNTIL }
+      { since: periodSince, until: periodUntil }
     );
 
     for (const reaction of reactions) {
@@ -204,7 +204,7 @@ export async function fetchNostrYearsStats(
 
     onProgress?.({
       phase: 'fetching_reactions',
-      message: `自分への反応を取得中... (${Math.min(i + batchSize, ownKind1Ids.length)}/${ownKind1Ids.length})`,
+      message: `Fetching reactions... (${Math.min(i + batchSize, ownKind1Ids.length)}/${ownKind1Ids.length})`,
       progress: 40 + (i / ownKind1Ids.length) * 20,
     });
   }
@@ -227,7 +227,7 @@ export async function fetchNostrYearsStats(
 
   onProgress?.({
     phase: 'fetching_mentions',
-    message: '自分へのリプライを取得中...',
+    message: 'Fetching replies to you...',
     progress: 70,
   });
 
@@ -235,7 +235,7 @@ export async function fetchNostrYearsStats(
   const mentionEvents = await f.fetchAllEvents(
     relays,
     { kinds: [1], '#p': [pubkey] },
-    { since: PERIOD_SINCE, until: PERIOD_UNTIL }
+    { since: periodSince, until: periodUntil }
   );
 
   for (const event of mentionEvents) {
@@ -246,7 +246,7 @@ export async function fetchNostrYearsStats(
 
   onProgress?.({
     phase: 'calculating',
-    message: '統計を計算中...',
+    message: 'Calculating statistics...',
     progress: 90,
   });
 
@@ -260,7 +260,7 @@ export async function fetchNostrYearsStats(
 
   onProgress?.({
     phase: 'done',
-    message: '完了！',
+    message: 'Done!',
     progress: 100,
   });
 

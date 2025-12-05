@@ -9,23 +9,23 @@ function App() {
   const { stats, isLoading, progress, error, isFromCache, fetchStats, reset } = useNostrStats();
   const [lastPubkey, setLastPubkey] = useState<string | null>(null);
   const [lastRelays, setLastRelays] = useState<string[]>([]);
+  const [lastPeriod, setLastPeriod] = useState<{ since: number; until: number } | null>(null);
 
-  const handleSubmit = useCallback((pubkey: string, relays: string[]) => {
+  const handleSubmit = useCallback((pubkey: string, relays: string[], periodSince: number, periodUntil: number) => {
     setLastPubkey(pubkey);
     setLastRelays(relays);
-    fetchStats(pubkey, relays);
+    setLastPeriod({ since: periodSince, until: periodUntil });
+    fetchStats(pubkey, relays, periodSince, periodUntil);
   }, [fetchStats]);
 
   const handleRefresh = useCallback(() => {
-    if (lastPubkey && lastRelays.length > 0) {
-      // Reset and refetch with force flag (will be implemented)
+    if (lastPubkey && lastRelays.length > 0 && lastPeriod) {
       reset();
-      // Small delay to ensure reset completes
       setTimeout(() => {
-        fetchStats(lastPubkey, lastRelays);
+        fetchStats(lastPubkey, lastRelays, lastPeriod.since, lastPeriod.until);
       }, 100);
     }
-  }, [lastPubkey, lastRelays, reset, fetchStats]);
+  }, [lastPubkey, lastRelays, lastPeriod, reset, fetchStats]);
 
   return (
     <ThemeProvider theme={theme}>

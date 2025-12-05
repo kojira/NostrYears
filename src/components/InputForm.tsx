@@ -8,6 +8,7 @@ import {
   Alert,
   Stack,
   Avatar,
+  Collapse,
 } from '@mui/material';
 import { nip19 } from 'nostr-tools';
 import { hasNip07, getPubkeyFromNip07 } from '../services/nostrPublisher';
@@ -16,10 +17,14 @@ import { RelaySettings } from './RelaySettings';
 import type { FetchProgress, NostrProfile } from '../types/nostr';
 
 interface InputFormProps {
-  onSubmit: (pubkey: string, relays: string[]) => void;
+  onSubmit: (pubkey: string, relays: string[], periodSince: number, periodUntil: number) => void;
   isLoading: boolean;
   progress: FetchProgress | null;
 }
+
+// Default period: 2025/1/1 0:00:00 JST to 2025/12/1 0:00:00 JST
+const DEFAULT_SINCE = '2025-01-01';
+const DEFAULT_UNTIL = '2025-12-01';
 
 export function InputForm({ onSubmit, isLoading, progress }: InputFormProps) {
   const [npubInput, setNpubInput] = useState('');
@@ -28,9 +33,12 @@ export function InputForm({ onSubmit, isLoading, progress }: InputFormProps) {
   const [hasExtension, setHasExtension] = useState(false);
   const [previewProfile, setPreviewProfile] = useState<NostrProfile | null>(null);
   const [previewPubkey, setPreviewPubkey] = useState<string | null>(null);
+  const [showPeriodSettings, setShowPeriodSettings] = useState(false);
+  const [sinceDateInput, setSinceDateInput] = useState(DEFAULT_SINCE);
+  const [untilDateInput, setUntilDateInput] = useState(DEFAULT_UNTIL);
 
   useEffect(() => {
-    // Check for NIP-07 extension after a short delay (extensions may load after page)
+    // Check for NIP-07 extension after a short delay
     const timer = setTimeout(() => {
       setHasExtension(hasNip07());
     }, 500);
@@ -40,7 +48,6 @@ export function InputForm({ onSubmit, isLoading, progress }: InputFormProps) {
   const parsePubkey = (pubkeyOrNpub: string): string | null => {
     let pubkey = pubkeyOrNpub;
     
-    // If it starts with npub, decode it
     if (pubkeyOrNpub.startsWith('npub')) {
       try {
         const decoded = nip19.decode(pubkeyOrNpub);
@@ -53,7 +60,6 @@ export function InputForm({ onSubmit, isLoading, progress }: InputFormProps) {
       }
     }
     
-    // Validate hex pubkey
     if (!/^[0-9a-f]{64}$/i.test(pubkey)) {
       return null;
     }
@@ -61,26 +67,43 @@ export function InputForm({ onSubmit, isLoading, progress }: InputFormProps) {
     return pubkey.toLowerCase();
   };
 
+  const getUnixTimestamp = (dateStr: string, isEndOfDay: boolean): number => {
+    // Parse as JST (UTC+9)
+    const date = new Date(dateStr + 'T00:00:00+09:00');
+    if (isEndOfDay) {
+      date.setHours(23, 59, 59, 999);
+    }
+    return Math.floor(date.getTime() / 1000);
+  };
+
   const validateAndSubmit = (pubkeyOrNpub: string) => {
     setError(null);
     
     if (relays.length === 0) {
-      setError('少なくとも1つのリレーを選択してください');
+      setError('Please select at least one relay');
       return;
     }
     
     const pubkey = parsePubkey(pubkeyOrNpub);
     if (!pubkey) {
-      setError('無効な公開鍵です');
+      setError('Invalid public key');
+      return;
+    }
+
+    const periodSince = getUnixTimestamp(sinceDateInput, false);
+    const periodUntil = getUnixTimestamp(untilDateInput, true);
+
+    if (periodSince >= periodUntil) {
+      setError('Start date must be before end date');
       return;
     }
     
-    onSubmit(pubkey, relays);
+    onSubmit(pubkey, relays, periodSince, periodUntil);
   };
 
   const handleNpubSubmit = () => {
     if (!npubInput.trim()) {
-      setError('npubを入力してください');
+      setError('Please enter npub');
       return;
     }
     validateAndSubmit(npubInput.trim());
@@ -90,12 +113,10 @@ export function InputForm({ onSubmit, isLoading, progress }: InputFormProps) {
     setError(null);
     const pubkey = await getPubkeyFromNip07();
     if (pubkey) {
-      // Convert to npub and set in input field
       try {
         const npub = nip19.npubEncode(pubkey);
         setNpubInput(npub);
         
-        // Fetch and show profile preview
         setPreviewPubkey(pubkey);
         const profile = await fetchProfile(pubkey, relays);
         setPreviewProfile(profile);
@@ -103,11 +124,10 @@ export function InputForm({ onSubmit, isLoading, progress }: InputFormProps) {
         setNpubInput(pubkey);
       }
     } else {
-      setError('NIP-07拡張から公開鍵を取得できませんでした');
+      setError('Failed to get public key from NIP-07 extension');
     }
   };
 
-  // Fetch profile preview when input changes
   useEffect(() => {
     const fetchPreview = async () => {
       const input = npubInput.trim();
@@ -171,13 +191,13 @@ export function InputForm({ onSubmit, isLoading, progress }: InputFormProps) {
           mb: 2,
         }}
       >
-        2025年のNostr活動を振り返ろう
+        Review Your Nostr Activity
       </Typography>
 
       <Stack spacing={2} sx={{ width: '100%', maxWidth: 400, alignItems: 'center' }}>
         <TextField
           fullWidth
-          label="npub または 公開鍵 (hex)"
+          label="npub or Public Key (hex)"
           placeholder="npub1..."
           value={npubInput}
           onChange={(e) => setNpubInput(e.target.value)}
@@ -226,6 +246,42 @@ export function InputForm({ onSubmit, isLoading, progress }: InputFormProps) {
             </Box>
           </Box>
         )}
+
+        {/* Period Settings */}
+        <Button
+          variant="text"
+          size="small"
+          onClick={() => setShowPeriodSettings(!showPeriodSettings)}
+          sx={{ color: 'text.secondary' }}
+          disabled={isLoading}
+        >
+          📅 Period Settings {showPeriodSettings ? '▲' : '▼'}
+        </Button>
+        
+        <Collapse in={showPeriodSettings} sx={{ width: '100%' }}>
+          <Box sx={{ display: 'flex', gap: 2, width: '100%' }}>
+            <TextField
+              fullWidth
+              type="date"
+              label="From"
+              value={sinceDateInput}
+              onChange={(e) => setSinceDateInput(e.target.value)}
+              disabled={isLoading}
+              InputLabelProps={{ shrink: true }}
+              size="small"
+            />
+            <TextField
+              fullWidth
+              type="date"
+              label="To"
+              value={untilDateInput}
+              onChange={(e) => setUntilDateInput(e.target.value)}
+              disabled={isLoading}
+              InputLabelProps={{ shrink: true }}
+              size="small"
+            />
+          </Box>
+        </Collapse>
         
         <RelaySettings
           relays={relays}
@@ -246,7 +302,7 @@ export function InputForm({ onSubmit, isLoading, progress }: InputFormProps) {
             },
           }}
         >
-          集計開始
+          Start Analysis
         </Button>
 
         {hasExtension && (
@@ -255,7 +311,7 @@ export function InputForm({ onSubmit, isLoading, progress }: InputFormProps) {
               variant="body2"
               sx={{ textAlign: 'center', color: 'text.secondary' }}
             >
-              または
+              or
             </Typography>
             
             <Button
@@ -273,7 +329,7 @@ export function InputForm({ onSubmit, isLoading, progress }: InputFormProps) {
                 },
               }}
             >
-              🔑 NIP-07拡張から取得
+              🔑 Get from NIP-07 Extension
             </Button>
           </>
         )}
@@ -286,7 +342,6 @@ export function InputForm({ onSubmit, isLoading, progress }: InputFormProps) {
 
         {isLoading && progress && (
           <Box sx={{ mt: 3, width: '100%' }}>
-            {/* Show profile during loading */}
             {previewProfile && (
               <Box
                 sx={{
@@ -317,7 +372,7 @@ export function InputForm({ onSubmit, isLoading, progress }: InputFormProps) {
                     {getDisplayName()}
                   </Typography>
                   <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                    の2025年を集計中...
+                    Analyzing...
                   </Typography>
                 </Box>
               </Box>
@@ -352,8 +407,7 @@ export function InputForm({ onSubmit, isLoading, progress }: InputFormProps) {
             maxWidth: 400,
           }}
         >
-          💡 NIP-07対応の拡張機能（nos2x, Albyなど）をインストールすると、
-          結果をリレーに投稿して他のユーザーと比較できます
+          💡 Install a NIP-07 extension (nos2x, Alby, etc.) to post your results to relays and compare with other users
         </Typography>
       )}
     </Box>

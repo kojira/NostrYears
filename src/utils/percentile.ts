@@ -53,11 +53,11 @@ export function calculateAllPercentiles(
  * Format percentile for display
  */
 export function formatPercentile(percentile: number): string {
-  if (percentile <= 1) return '上位 1%';
-  if (percentile <= 5) return '上位 5%';
-  if (percentile <= 10) return '上位 10%';
-  if (percentile <= 25) return '上位 25%';
-  if (percentile <= 50) return '上位 50%';
-  return `上位 ${percentile}%`;
+  if (percentile <= 1) return 'Top 1%';
+  if (percentile <= 5) return 'Top 5%';
+  if (percentile <= 10) return 'Top 10%';
+  if (percentile <= 25) return 'Top 25%';
+  if (percentile <= 50) return 'Top 50%';
+  return `Top ${percentile}%`;
 }
 

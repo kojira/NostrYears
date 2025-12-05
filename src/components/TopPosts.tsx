@@ -45,7 +45,6 @@ export function TopPosts({ topPosts, relays }: TopPostsProps) {
         const event = await fetchEventById(post.id, relays);
         if (event) {
           newEvents.set(post.id, event);
-          // Extract URLs for OG fetching
           const eventUrls = extractUrls(event.content);
           urls.push(...eventUrls);
         }
@@ -54,7 +53,6 @@ export function TopPosts({ topPosts, relays }: TopPostsProps) {
       setEvents(newEvents);
       setLoading(false);
       
-      // Fetch OG data for URLs (best effort, may fail due to CORS)
       fetchOgData(urls);
     };
     
@@ -64,9 +62,8 @@ export function TopPosts({ topPosts, relays }: TopPostsProps) {
   const fetchOgData = async (urls: string[]) => {
     const uniqueUrls = [...new Set(urls)].filter(url => !ogCache.has(url));
     
-    for (const url of uniqueUrls.slice(0, 5)) { // Limit to 5 URLs
+    for (const url of uniqueUrls.slice(0, 5)) {
       try {
-        // Using a CORS proxy or direct fetch (may fail)
         const response = await fetch(`https://api.microlink.io/?url=${encodeURIComponent(url)}`);
         if (response.ok) {
           const data = await response.json();
@@ -80,7 +77,6 @@ export function TopPosts({ topPosts, relays }: TopPostsProps) {
           }
         }
       } catch {
-        // OG fetch failed, will show simple link instead
         setOgCache(prev => new Map(prev).set(url, null));
       }
     }
@@ -88,12 +84,10 @@ export function TopPosts({ topPosts, relays }: TopPostsProps) {
 
   const formatContent = (content: string): string => {
     let text = content;
-    // Remove image URLs
     const imageUrls = extractImageUrls(content);
     for (const url of imageUrls) {
       text = text.replace(url, '');
     }
-    // Remove other URLs (they'll be shown as cards)
     const otherUrls = extractUrls(content);
     for (const url of otherUrls) {
       text = text.replace(url, '');
@@ -125,10 +119,10 @@ export function TopPosts({ topPosts, relays }: TopPostsProps) {
       <Card sx={{ height: '100%' }}>
         <CardContent sx={{ p: 3 }}>
           <Typography variant="h5" sx={{ mb: 3, fontWeight: 600 }}>
-            🏆 リアクションが多かった投稿 TOP3
+            🏆 Most Reacted Posts TOP3
           </Typography>
           <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-            データがありません
+            No data available
           </Typography>
         </CardContent>
       </Card>
@@ -139,7 +133,7 @@ export function TopPosts({ topPosts, relays }: TopPostsProps) {
     <Card sx={{ height: '100%' }}>
       <CardContent sx={{ p: 3 }}>
         <Typography variant="h5" sx={{ mb: 3, fontWeight: 600 }}>
-          🏆 リアクションが多かった投稿 TOP3
+          🏆 Most Reacted Posts TOP3
         </Typography>
         
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
@@ -228,7 +222,7 @@ export function TopPosts({ topPosts, relays }: TopPostsProps) {
                             <Box
                               component="img"
                               src={url}
-                              alt={`投稿画像 ${imgIndex + 1}`}
+                              alt={`Post image ${imgIndex + 1}`}
                               sx={{
                                 width: '100%',
                                 height: 'auto',
@@ -245,7 +239,7 @@ export function TopPosts({ topPosts, relays }: TopPostsProps) {
                         ))}
                         {imageUrls.length > 2 && (
                           <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                            +{imageUrls.length - 2} 枚
+                            +{imageUrls.length - 2} more
                           </Typography>
                         )}
                       </Box>
@@ -346,7 +340,7 @@ export function TopPosts({ topPosts, relays }: TopPostsProps) {
                     {/* Footer */}
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 1 }}>
                       <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                        {new Date(event.created_at * 1000).toLocaleDateString('ja-JP')}
+                        {new Date(event.created_at * 1000).toLocaleDateString('en-US')}
                       </Typography>
                       <Link
                         href={getNostrLink(post.id)}
@@ -361,13 +355,13 @@ export function TopPosts({ topPosts, relays }: TopPostsProps) {
                           },
                         }}
                       >
-                        詳細 →
+                        View →
                       </Link>
                     </Box>
                   </Box>
                 ) : (
                   <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                    投稿の取得に失敗しました
+                    Failed to load post
                   </Typography>
                 )}
               </Box>
@@ -378,4 +372,3 @@ export function TopPosts({ topPosts, relays }: TopPostsProps) {
     </Card>
   );
 }
-

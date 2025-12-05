@@ -36,13 +36,13 @@ export function RelaySettings({ relays, onRelaysChange, disabled }: RelaySetting
     try {
       new URL(url);
     } catch {
-      setError('無効なURLです');
+      setError('Invalid URL');
       return;
     }
     
     // Check for duplicates
     if (relays.includes(url)) {
-      setError('このリレーは既に追加されています');
+      setError('This relay is already added');
       return;
     }
     
@@ -66,7 +66,7 @@ export function RelaySettings({ relays, onRelaysChange, disabled }: RelaySetting
         onClick={() => setExpanded(!expanded)}
         sx={{ color: 'text.secondary', mb: 1 }}
       >
-        ⚙️ リレー設定 {expanded ? '▲' : '▼'}
+        ⚙️ Relay Settings {expanded ? '▲' : '▼'}
       </Button>
       
       <Collapse in={expanded}>
@@ -78,8 +78,7 @@ export function RelaySettings({ relays, onRelaysChange, disabled }: RelaySetting
           }}
         >
           <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2 }}>
-            使用するリレーを設定できます。同じリレーを使用した他のユーザーとのみ
-            パーセンタイル比較が可能です。
+            Configure the relays to use. Percentile comparison is only available with users using the same relays.
           </Typography>
           
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
@@ -97,7 +96,7 @@ export function RelaySettings({ relays, onRelaysChange, disabled }: RelaySetting
             ))}
             {relays.length === 0 && (
               <Typography variant="body2" sx={{ color: 'error.main' }}>
-                リレーが選択されていません
+                No relays selected
               </Typography>
             )}
           </Box>
@@ -124,7 +123,7 @@ export function RelaySettings({ relays, onRelaysChange, disabled }: RelaySetting
               onClick={handleAddRelay}
               disabled={disabled || !newRelay.trim()}
             >
-              追加
+              Add
             </Button>
           </Box>
           
@@ -135,11 +134,10 @@ export function RelaySettings({ relays, onRelaysChange, disabled }: RelaySetting
             disabled={disabled}
             sx={{ color: 'text.secondary' }}
           >
-            デフォルトに戻す
+            Reset to Default
           </Button>
         </Paper>
       </Collapse>
     </Box>
   );
 }
-

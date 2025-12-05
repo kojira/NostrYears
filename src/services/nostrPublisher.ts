@@ -1,7 +1,7 @@
 import { Relay } from 'nostr-tools';
 import type { NostrYearsStats, NostrYearsEventContent, UnsignedEvent } from '../types/nostr';
 import { NOSTR_YEARS_VERSION } from '../types/nostr';
-import { DEFAULT_RELAYS, PERIOD_SINCE, PERIOD_UNTIL, initFetcher } from './nostrFetcher';
+import { DEFAULT_RELAYS, initFetcher } from './nostrFetcher';
 
 const NOSTR_YEARS_D_TAG = 'nostr-years-2025';
 const NOSTR_YEARS_KIND = 30078;
@@ -121,12 +121,8 @@ export async function fetchAllNostrYearsEvents(
     for (const event of events) {
       try {
         const content = JSON.parse(event.content) as NostrYearsEventContent;
-        // Validate period and version
-        if (
-          content.period?.since === PERIOD_SINCE && 
-          content.period?.until === PERIOD_UNTIL &&
-          content.version === NOSTR_YEARS_VERSION
-        ) {
+        // Validate version only (period can vary)
+        if (content.version === NOSTR_YEARS_VERSION) {
           contents.push(content);
         }
       } catch {
@@ -162,12 +158,8 @@ export async function fetchOwnNostrYearsEvent(
 
     if (event) {
       const content = JSON.parse(event.content) as NostrYearsEventContent;
-      // Validate period and version
-      if (
-        content.period?.since === PERIOD_SINCE && 
-        content.period?.until === PERIOD_UNTIL &&
-        content.version === NOSTR_YEARS_VERSION
-      ) {
+      // Validate version only
+      if (content.version === NOSTR_YEARS_VERSION) {
         return content;
       }
     }

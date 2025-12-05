@@ -9,7 +9,7 @@ interface UseNostrStatsReturn {
   progress: FetchProgress | null;
   error: string | null;
   isFromCache: boolean;
-  fetchStats: (pubkey: string, relays: string[], force?: boolean) => Promise<void>;
+  fetchStats: (pubkey: string, relays: string[], periodSince: number, periodUntil: number, force?: boolean) => Promise<void>;
   reset: () => void;
 }
 
@@ -21,11 +21,17 @@ export function useNostrStats(): UseNostrStatsReturn {
   const [isFromCache, setIsFromCache] = useState(false);
   const skipCacheRef = useRef(false);
 
-  const fetchStats = useCallback(async (pubkey: string, relays: string[], force?: boolean) => {
+  const fetchStats = useCallback(async (
+    pubkey: string, 
+    relays: string[], 
+    periodSince: number, 
+    periodUntil: number,
+    force?: boolean
+  ) => {
     setIsLoading(true);
     setError(null);
     setIsFromCache(false);
-    setProgress({ phase: 'idle', message: '既存の集計結果を確認中...', progress: 5 });
+    setProgress({ phase: 'idle', message: 'Checking for existing results...', progress: 5 });
 
     const shouldSkipCache = force || skipCacheRef.current;
     skipCacheRef.current = false;
@@ -35,11 +41,16 @@ export function useNostrStats(): UseNostrStatsReturn {
       let existingStats = null;
       if (!shouldSkipCache) {
         existingStats = await fetchOwnNostrYearsEventWithRelays(pubkey, relays);
+        // Also check if the period matches
+        if (existingStats && 
+            (existingStats.period.since !== periodSince || existingStats.period.until !== periodUntil)) {
+          existingStats = null;
+        }
       }
       
       if (existingStats) {
         // Found existing stats, fetch profile and use cached data
-        setProgress({ phase: 'fetching_own', message: 'プロフィールを取得中...', progress: 50 });
+        setProgress({ phase: 'fetching_own', message: 'Fetching profile...', progress: 50 });
         const profile = await fetchProfile(pubkey, relays);
         
         const cachedStats: NostrYearsStats = {
@@ -60,19 +71,19 @@ export function useNostrStats(): UseNostrStatsReturn {
           friendsRanking: [], // Not stored in published event
         };
         
-        setProgress({ phase: 'done', message: '既存の集計結果を使用', progress: 100 });
+        setProgress({ phase: 'done', message: 'Using cached results', progress: 100 });
         setStats(cachedStats);
         setIsFromCache(true);
       } else {
         // No existing stats or forced refresh, fetch fresh
-        setProgress({ phase: 'fetching_own', message: 'プロフィールを取得中...', progress: 5 });
-        const fetchedStats = await fetchNostrYearsStats(pubkey, relays, setProgress);
+        setProgress({ phase: 'fetching_own', message: 'Fetching profile...', progress: 5 });
+        const fetchedStats = await fetchNostrYearsStats(pubkey, relays, periodSince, periodUntil, setProgress);
         setStats(fetchedStats);
         setIsFromCache(false);
       }
     } catch (err) {
       console.error('Error fetching stats:', err);
-      setError(err instanceof Error ? err.message : '統計の取得に失敗しました');
+      setError(err instanceof Error ? err.message : 'Failed to fetch stats');
     } finally {
       setIsLoading(false);
     }

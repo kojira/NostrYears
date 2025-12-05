@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   Box,
   Grid,
@@ -10,7 +10,11 @@ import {
   Chip,
   Card,
   CardContent,
+  TextField,
+  IconButton,
+  Tooltip,
 } from '@mui/material';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import { nip19 } from 'nostr-tools';
 import { StatsCard } from './StatsCard';
 import { FriendsRanking } from './FriendsRanking';
@@ -39,10 +43,8 @@ export function YearSummary({ stats, onReset, isFromCache, onRefresh }: YearSumm
 
   useEffect(() => {
     const loadPercentiles = async () => {
-      // Use the same relays for percentile calculation
       const allStats = await fetchAllNostrYearsEvents(stats.relays);
       
-      // Filter to only include stats from the same relays
       const sameRelayStats = allStats.filter(s => 
         s.relays && 
         s.relays.length === stats.relays.length &&
@@ -70,11 +72,10 @@ export function YearSummary({ stats, onReset, isFromCache, onRefresh }: YearSumm
       setPublished(true);
       setSnackbar({
         open: true,
-        message: '結果をリレーに投稿しました！',
+        message: 'Posted to relays!',
         severity: 'success',
       });
       
-      // Reload percentiles after publishing
       const allStats = await fetchAllNostrYearsEvents(stats.relays);
       const sameRelayStats = allStats.filter(s => 
         s.relays && 
@@ -91,7 +92,7 @@ export function YearSummary({ stats, onReset, isFromCache, onRefresh }: YearSumm
     } else {
       setSnackbar({
         open: true,
-        message: 'リレーへの投稿に失敗しました',
+        message: 'Failed to post to relays',
         severity: 'error',
       });
     }
@@ -105,6 +106,57 @@ export function YearSummary({ stats, onReset, isFromCache, onRefresh }: YearSumm
       return `${npub.slice(0, 12)}...${npub.slice(-8)}`;
     } catch {
       return `${stats.pubkey.slice(0, 8)}...`;
+    }
+  };
+
+  const formatDate = (timestamp: number): string => {
+    return new Date(timestamp * 1000).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+  };
+
+  const periodString = `${formatDate(stats.period.since)} - ${formatDate(stats.period.until)}`;
+
+  // Generate summary text for sharing
+  const summaryText = useMemo(() => {
+    const lines = [
+      `📊 My #NostrYears Summary`,
+      `📅 Period: ${periodString}`,
+      ``,
+      `📝 Posts: ${stats.kind1Count.toLocaleString()}`,
+      `✍️ Characters: ${stats.kind1Chars.toLocaleString()}`,
+      `🖼️ Images: ${stats.imageCount.toLocaleString()}`,
+      `📄 Long-form articles: ${stats.kind30023Count.toLocaleString()}`,
+      `🔄 Reposts: ${stats.kind6Count.toLocaleString()}`,
+      `❤️ Reactions: ${stats.kind7Count.toLocaleString()}`,
+      `💬 Chat messages: ${stats.kind42Count.toLocaleString()}`,
+    ];
+
+    if (stats.topReactionEmojis.length > 0) {
+      lines.push(``, `Top reactions: ${stats.topReactionEmojis.map(e => `${e.emoji}(${e.count})`).join(' ')}`);
+    }
+
+    lines.push(``, `#nostryears`);
+
+    return lines.join('\n');
+  }, [stats, periodString]);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(summaryText);
+      setSnackbar({
+        open: true,
+        message: 'Copied to clipboard!',
+        severity: 'success',
+      });
+    } catch {
+      setSnackbar({
+        open: true,
+        message: 'Failed to copy',
+        severity: 'error',
+      });
     }
   };
 
@@ -133,13 +185,13 @@ export function YearSummary({ stats, onReset, isFromCache, onRefresh }: YearSumm
             },
           }}
         >
-          ← 別のユーザー
+          ← Search another user
         </Button>
       </Box>
 
       <Box sx={{ textAlign: 'center', mb: 4 }}>
         <Typography variant="h1" sx={{ mb: 3 }}>
-          NostrYears 2025
+          NostrYears
         </Typography>
         
         {/* User Profile Section */}
@@ -168,13 +220,21 @@ export function YearSummary({ stats, onReset, isFromCache, onRefresh }: YearSumm
             {getDisplayName()}
           </Typography>
           <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-            の2025年のNostr活動まとめ
+            Nostr Activity Summary
           </Typography>
+          <Chip
+            label={periodString}
+            size="small"
+            sx={{ 
+              mt: 0.5,
+              backgroundColor: 'rgba(156, 39, 176, 0.2)',
+            }}
+          />
           
           {/* Cache indicator */}
           {isFromCache && (
             <Chip
-              label="📦 投稿済みデータを表示中"
+              label="📦 Showing cached data"
               size="small"
               sx={{ 
                 mt: 1,
@@ -196,7 +256,7 @@ export function YearSummary({ stats, onReset, isFromCache, onRefresh }: YearSumm
                   color: 'text.secondary',
                 }}
               >
-                🔄 再集計する
+                🔄 Re-analyze
               </Button>
             )}
             
@@ -213,13 +273,13 @@ export function YearSummary({ stats, onReset, isFromCache, onRefresh }: YearSumm
                   },
                 }}
               >
-                {publishing ? '投稿中...' : '📤 結果をリレーに投稿'}
+                {publishing ? 'Posting...' : '📤 Post to Relays'}
               </Button>
             )}
             
             {(published || isFromCache) && (
               <Chip
-                label="✓ 投稿済み"
+                label="✓ Posted"
                 size="small"
                 sx={{ backgroundColor: 'rgba(76, 175, 80, 0.2)', color: '#4caf50' }}
               />
@@ -232,9 +292,9 @@ export function YearSummary({ stats, onReset, isFromCache, onRefresh }: YearSumm
         {/* Kind 1 Stats */}
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <StatsCard
-            title="投稿数 (kind 1)"
+            title="Posts (kind 1)"
             value={stats.kind1Count}
-            unit="件"
+            unit=""
             percentile={percentiles?.kind1Count}
             icon="📝"
           />
@@ -242,9 +302,9 @@ export function YearSummary({ stats, onReset, isFromCache, onRefresh }: YearSumm
         
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <StatsCard
-            title="投稿文字数 (URL除く)"
+            title="Characters (excl. URLs)"
             value={stats.kind1Chars}
-            unit="文字"
+            unit=""
             percentile={percentiles?.kind1Chars}
             icon="✍️"
           />
@@ -252,9 +312,9 @@ export function YearSummary({ stats, onReset, isFromCache, onRefresh }: YearSumm
         
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <StatsCard
-            title="投稿画像数"
+            title="Images Posted"
             value={stats.imageCount}
-            unit="枚"
+            unit=""
             percentile={percentiles?.imageCount}
             icon="🖼️"
           />
@@ -262,9 +322,9 @@ export function YearSummary({ stats, onReset, isFromCache, onRefresh }: YearSumm
         
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <StatsCard
-            title="長文記事 (kind 30023)"
+            title="Long-form (kind 30023)"
             value={stats.kind30023Count}
-            unit="件"
+            unit=""
             percentile={percentiles?.kind30023Count}
             icon="📄"
           />
@@ -273,9 +333,9 @@ export function YearSummary({ stats, onReset, isFromCache, onRefresh }: YearSumm
         {/* Interaction Stats */}
         <Grid size={{ xs: 12, sm: 6, md: 4 }}>
           <StatsCard
-            title="リポスト (kind 6)"
+            title="Reposts (kind 6)"
             value={stats.kind6Count}
-            unit="件"
+            unit=""
             percentile={percentiles?.kind6Count}
             icon="🔄"
             color="#2196f3"
@@ -284,9 +344,9 @@ export function YearSummary({ stats, onReset, isFromCache, onRefresh }: YearSumm
         
         <Grid size={{ xs: 12, sm: 6, md: 4 }}>
           <StatsCard
-            title="リアクション (kind 7)"
+            title="Reactions (kind 7)"
             value={stats.kind7Count}
-            unit="件"
+            unit=""
             percentile={percentiles?.kind7Count}
             icon="❤️"
             color="#e91e63"
@@ -295,9 +355,9 @@ export function YearSummary({ stats, onReset, isFromCache, onRefresh }: YearSumm
         
         <Grid size={{ xs: 12, sm: 6, md: 4 }}>
           <StatsCard
-            title="チャット (kind 42)"
+            title="Chat (kind 42)"
             value={stats.kind42Count}
-            unit="件"
+            unit=""
             percentile={percentiles?.kind42Count}
             icon="💬"
             color="#4caf50"
@@ -310,7 +370,7 @@ export function YearSummary({ stats, onReset, isFromCache, onRefresh }: YearSumm
             <Card sx={{ height: '100%' }}>
               <CardContent sx={{ p: 3 }}>
                 <Typography variant="h5" sx={{ mb: 2, fontWeight: 600 }}>
-                  😊 よく使ったリアクション
+                  😊 Top Reactions
                 </Typography>
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
                   {stats.topReactionEmojis.map((item, index) => (
@@ -349,7 +409,7 @@ export function YearSummary({ stats, onReset, isFromCache, onRefresh }: YearSumm
                           WebkitTextFillColor: 'transparent',
                         }}
                       >
-                        {item.count.toLocaleString()}回
+                        {item.count.toLocaleString()}x
                       </Typography>
                     </Box>
                   ))}
@@ -378,14 +438,53 @@ export function YearSummary({ stats, onReset, isFromCache, onRefresh }: YearSumm
         {stats.kind30023Count > 0 && (
           <Grid size={{ xs: 12, sm: 6, md: 4 }}>
             <StatsCard
-              title="長文記事の総文字数"
+              title="Long-form Characters"
               value={stats.kind30023Chars}
-              unit="文字"
+              unit=""
               icon="📚"
               color="#ff9800"
             />
           </Grid>
         )}
+
+        {/* Share Text Box */}
+        <Grid size={{ xs: 12 }}>
+          <Card>
+            <CardContent sx={{ p: 3 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                <Typography variant="h5" sx={{ fontWeight: 600 }}>
+                  📋 Share Your Results
+                </Typography>
+                <Tooltip title="Copy to clipboard">
+                  <IconButton
+                    onClick={handleCopy}
+                    sx={{
+                      color: 'primary.main',
+                      '&:hover': {
+                        backgroundColor: 'rgba(156, 39, 176, 0.1)',
+                      },
+                    }}
+                  >
+                    <ContentCopyIcon />
+                  </IconButton>
+                </Tooltip>
+              </Box>
+              <TextField
+                fullWidth
+                multiline
+                rows={10}
+                value={summaryText}
+                InputProps={{
+                  readOnly: true,
+                  sx: {
+                    fontFamily: 'monospace',
+                    fontSize: '0.875rem',
+                  },
+                }}
+              />
+            </CardContent>
+          </Card>
+        </Grid>
       </Grid>
 
       {/* Footer with relay info */}
@@ -398,7 +497,7 @@ export function YearSummary({ stats, onReset, isFromCache, onRefresh }: YearSumm
         }}
       >
         <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mb: 1 }}>
-          使用リレー
+          Relays Used
         </Typography>
         <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', justifyContent: 'center', mb: 1 }}>
           {stats.relays.map((relay) => (
@@ -418,7 +517,7 @@ export function YearSummary({ stats, onReset, isFromCache, onRefresh }: YearSumm
         </Box>
         {percentileCount > 0 && (
           <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-            {percentileCount} 人のユーザーと比較
+            Compared with {percentileCount} users
           </Typography>
         )}
       </Box>

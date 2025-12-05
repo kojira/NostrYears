@@ -47,7 +47,6 @@ export function FriendsRanking({ friends, relays }: FriendsRankingProps) {
     if (profile?.display_name) return profile.display_name;
     if (profile?.name) return profile.name;
     
-    // Fallback to shortened npub
     try {
       const npub = nip19.npubEncode(pubkey);
       return `${npub.slice(0, 12)}...${npub.slice(-8)}`;
@@ -82,10 +81,10 @@ export function FriendsRanking({ friends, relays }: FriendsRankingProps) {
   };
 
   const getBalanceLabel = (balance: number): string => {
-    if (balance >= 0.9) return '最高';
-    if (balance >= 0.7) return '良好';
-    if (balance >= 0.5) return '普通';
-    return '片思い';
+    if (balance >= 0.9) return 'Best';
+    if (balance >= 0.7) return 'Good';
+    if (balance >= 0.5) return 'OK';
+    return 'One-way';
   };
 
   const getBalanceColor = (balance: number): string => {
@@ -99,15 +98,15 @@ export function FriendsRanking({ friends, relays }: FriendsRankingProps) {
     <Card sx={{ height: '100%' }}>
       <CardContent sx={{ p: 3 }}>
         <Typography variant="h5" sx={{ mb: 1, fontWeight: 600 }}>
-          🤝 仲良しランキング TOP10
+          🤝 Friends Ranking TOP10
         </Typography>
         <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mb: 2 }}>
-          あなたがリアクションを送った相手（バランスが良いほど相思相愛）
+          People you reacted to (balanced = mutual friendship)
         </Typography>
         
         {friends.length === 0 ? (
           <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-            データがありません
+            No data available
           </Typography>
         ) : (
           <List sx={{ p: 0 }}>
@@ -205,7 +204,7 @@ export function FriendsRanking({ friends, relays }: FriendsRankingProps) {
                     {friend.outgoingReactions}
                   </Typography>
                   <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.65rem' }}>
-                    送った❤️
+                    sent ❤️
                   </Typography>
                 </Box>
               </ListItem>
