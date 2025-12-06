@@ -12,7 +12,7 @@ import {
 } from '@mui/material';
 import { nip19 } from 'nostr-tools';
 import { hasNip07, getPubkeyFromNip07 } from '../services/nostrPublisher';
-import { DEFAULT_RELAYS, fetchProfile } from '../services/nostrFetcher';
+import { DEFAULT_RELAYS, fetchProfile, fetchRelayList } from '../services/nostrFetcher';
 import { RelaySettings } from './RelaySettings';
 import { RecentResults } from './RecentResults';
 import type { FetchProgress, NostrProfile, NostrYearsEventContent } from '../types/nostr';
@@ -38,6 +38,7 @@ export function InputForm({ onSubmit, onLoadCachedResult, isLoading, progress }:
   const [showPeriodSettings, setShowPeriodSettings] = useState(false);
   const [sinceDateInput, setSinceDateInput] = useState(DEFAULT_SINCE);
   const [untilDateInput, setUntilDateInput] = useState(DEFAULT_UNTIL);
+  const [isFetchingRelays, setIsFetchingRelays] = useState(false);
 
   useEffect(() => {
     // Check for NIP-07 extension after a short delay
@@ -127,6 +128,38 @@ export function InputForm({ onSubmit, onLoadCachedResult, isLoading, progress }:
       }
     } else {
       setError('Failed to get public key from NIP-07 extension');
+    }
+  };
+
+  const handleFetchRelays = async () => {
+    setError(null);
+    const input = npubInput.trim();
+    if (!input) {
+      setError('Please enter npub first');
+      return;
+    }
+
+    const pubkey = parsePubkey(input);
+    if (!pubkey) {
+      setError('Invalid public key');
+      return;
+    }
+
+    setIsFetchingRelays(true);
+    try {
+      // Fetch relay list from multiple sources
+      const relayList = await fetchRelayList(pubkey, [...DEFAULT_RELAYS, ...relays]);
+      if (relayList.length > 0) {
+        // Merge with existing relays, removing duplicates
+        const uniqueRelays = Array.from(new Set([...relayList, ...relays]));
+        setRelays(uniqueRelays);
+      } else {
+        setError('No relay list found for this user (NIP-65)');
+      }
+    } catch {
+      setError('Failed to fetch relay list');
+    } finally {
+      setIsFetchingRelays(false);
     }
   };
 
@@ -285,11 +318,22 @@ export function InputForm({ onSubmit, onLoadCachedResult, isLoading, progress }:
           </Box>
         </Collapse>
         
-        <RelaySettings
-          relays={relays}
-          onRelaysChange={setRelays}
-          disabled={isLoading}
-        />
+        <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 1 }}>
+          <RelaySettings
+            relays={relays}
+            onRelaysChange={setRelays}
+            disabled={isLoading}
+          />
+          <Button
+            size="small"
+            variant="text"
+            onClick={handleFetchRelays}
+            disabled={isLoading || isFetchingRelays || !npubInput.trim()}
+            sx={{ color: 'text.secondary', textTransform: 'none' }}
+          >
+            {isFetchingRelays ? '📡 Fetching...' : '📡 Fetch relays for this npub (NIP-65)'}
+          </Button>
+        </Box>
         
         <Button
           fullWidth

@@ -68,6 +68,39 @@ export function shutdownFetcher(): void {
 }
 
 /**
+ * Fetch user's relay list (NIP-65, kind 10002)
+ * Returns an array of relay URLs that are marked for read or read/write
+ */
+export async function fetchRelayList(pubkey: string, relays: string[] = DEFAULT_RELAYS): Promise<string[]> {
+  const f = initFetcher();
+  
+  try {
+    const event = await f.fetchLastEvent(relays, {
+      kinds: [10002],
+      authors: [pubkey],
+    });
+    
+    if (event) {
+      const relayUrls: string[] = [];
+      for (const tag of event.tags) {
+        if (tag[0] === 'r' && tag[1]) {
+          // If no marker or marker is "read" or no marker (both read/write), include it
+          const marker = tag[2];
+          if (!marker || marker === 'read') {
+            relayUrls.push(tag[1]);
+          }
+        }
+      }
+      return relayUrls;
+    }
+  } catch (error) {
+    console.error('Error fetching relay list:', error);
+  }
+  
+  return [];
+}
+
+/**
  * Fetch user profile (kind 0)
  */
 export async function fetchProfile(pubkey: string, relays: string[] = DEFAULT_RELAYS): Promise<NostrProfile | null> {
