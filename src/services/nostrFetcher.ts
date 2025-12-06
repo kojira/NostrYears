@@ -70,8 +70,39 @@ export function shutdownFetcher(): void {
 }
 
 /**
+ * Test if a relay is reachable by attempting WebSocket connection
+ * Returns true if connection succeeds within timeout
+ */
+async function testRelayConnection(relayUrl: string, timeoutMs: number = 3000): Promise<boolean> {
+  return new Promise((resolve) => {
+    try {
+      const ws = new WebSocket(relayUrl);
+      const timeout = setTimeout(() => {
+        ws.close();
+        resolve(false);
+      }, timeoutMs);
+
+      ws.onopen = () => {
+        clearTimeout(timeout);
+        ws.close();
+        resolve(true);
+      };
+
+      ws.onerror = () => {
+        clearTimeout(timeout);
+        ws.close();
+        resolve(false);
+      };
+    } catch {
+      resolve(false);
+    }
+  });
+}
+
+/**
  * Fetch user's relay list (NIP-65, kind 10002)
  * Returns an array of relay URLs that are marked for read or read/write
+ * Only returns relays that pass connection test
  */
 export async function fetchRelayList(pubkey: string, relays: string[] = DEFAULT_RELAYS): Promise<string[]> {
   const f = initFetcher();
@@ -93,7 +124,23 @@ export async function fetchRelayList(pubkey: string, relays: string[] = DEFAULT_
           }
         }
       }
-      return relayUrls;
+      
+      // Test each relay connection in parallel
+      const testResults = await Promise.all(
+        relayUrls.map(async (url) => ({
+          url,
+          reachable: await testRelayConnection(url),
+        }))
+      );
+      
+      // Return only reachable relays
+      const reachableRelays = testResults
+        .filter((r) => r.reachable)
+        .map((r) => r.url);
+      
+      console.log(`Relay test: ${reachableRelays.length}/${relayUrls.length} relays reachable`);
+      
+      return reachableRelays;
     }
   } catch (error) {
     console.error('Error fetching relay list:', error);
