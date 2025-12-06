@@ -103,7 +103,7 @@ export function YearSummary({ stats, onReset, isFromCache, onRefresh }: YearSumm
   // Generate summary text for sharing
   const summaryText = useMemo(() => {
     const lines = [
-      `📊 My #NostrYears Summary`,
+      `📊 My NostrYears Summary`,
       `📅 Period: ${periodString}`,
       ``,
       `📝 Posts: ${stats.kind1Count.toLocaleString()}`,
@@ -137,7 +137,7 @@ export function YearSummary({ stats, onReset, isFromCache, onRefresh }: YearSumm
 
   const handlePublish = async () => {
     setPublishing(true);
-    const success = await publishNostrYearsStats(stats, summaryText, stats.relays);
+    const success = await publishNostrYearsStats(stats, summaryText);
     setPublishing(false);
     
     if (success) {

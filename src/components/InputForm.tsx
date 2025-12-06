@@ -9,10 +9,20 @@ import {
   Stack,
   Avatar,
   Collapse,
+  Snackbar,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  List,
+  ListItem,
+  ListItemIcon,
+  ListItemText,
 } from '@mui/material';
+import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import { nip19 } from 'nostr-tools';
 import { hasNip07, getPubkeyFromNip07 } from '../services/nostrPublisher';
-import { DEFAULT_RELAYS, fetchProfile, fetchRelayList } from '../services/nostrFetcher';
+import { DEFAULT_RELAYS, fetchProfile, fetchRelayList, testRelays } from '../services/nostrFetcher';
 import { RelaySettings } from './RelaySettings';
 import { RecentResults } from './RecentResults';
 import type { FetchProgress, NostrProfile, NostrYearsEventContent } from '../types/nostr';
@@ -39,6 +49,24 @@ export function InputForm({ onSubmit, onLoadCachedResult, isLoading, progress }:
   const [sinceDateInput, setSinceDateInput] = useState(DEFAULT_SINCE);
   const [untilDateInput, setUntilDateInput] = useState(DEFAULT_UNTIL);
   const [isFetchingRelays, setIsFetchingRelays] = useState(false);
+  const [unreachableRelaysMessage, setUnreachableRelaysMessage] = useState<string | null>(null);
+  
+  // Relay warning dialog state
+  const [relayWarningDialog, setRelayWarningDialog] = useState<{
+    open: boolean;
+    unreachableRelays: string[];
+    reachableRelays: string[];
+    pubkey: string;
+    periodSince: number;
+    periodUntil: number;
+  }>({
+    open: false,
+    unreachableRelays: [],
+    reachableRelays: [],
+    pubkey: '',
+    periodSince: 0,
+    periodUntil: 0,
+  });
 
   useEffect(() => {
     // Check for NIP-07 extension after a short delay
@@ -79,8 +107,11 @@ export function InputForm({ onSubmit, onLoadCachedResult, isLoading, progress }:
     return Math.floor(date.getTime() / 1000);
   };
 
-  const validateAndSubmit = (pubkeyOrNpub: string) => {
+  const [isTestingRelays, setIsTestingRelays] = useState(false);
+
+  const validateAndSubmit = async (pubkeyOrNpub: string) => {
     setError(null);
+    setUnreachableRelaysMessage(null);
     
     if (relays.length === 0) {
       setError('Please select at least one relay');
@@ -100,16 +131,55 @@ export function InputForm({ onSubmit, onLoadCachedResult, isLoading, progress }:
       setError('Start date must be before end date');
       return;
     }
-    
-    onSubmit(pubkey, relays, periodSince, periodUntil);
+
+    // Test relay connections before starting analysis
+    setIsTestingRelays(true);
+    try {
+      const result = await testRelays(relays);
+      setIsTestingRelays(false);
+      
+      if (result.reachable.length === 0) {
+        setError('No reachable relays found. Please check your relay settings.');
+        return;
+      }
+
+      // Show warning dialog if there are unreachable relays
+      if (result.unreachable.length > 0) {
+        setRelayWarningDialog({
+          open: true,
+          unreachableRelays: result.unreachable,
+          reachableRelays: result.reachable,
+          pubkey,
+          periodSince,
+          periodUntil,
+        });
+        return;
+      }
+
+      // All relays are reachable, start analysis
+      onSubmit(pubkey, result.reachable, periodSince, periodUntil);
+    } catch {
+      setIsTestingRelays(false);
+      setError('Failed to test relay connections');
+    }
   };
 
-  const handleNpubSubmit = () => {
+  const handleRelayWarningConfirm = () => {
+    const { reachableRelays, pubkey, periodSince, periodUntil } = relayWarningDialog;
+    setRelayWarningDialog(prev => ({ ...prev, open: false }));
+    onSubmit(pubkey, reachableRelays, periodSince, periodUntil);
+  };
+
+  const handleRelayWarningCancel = () => {
+    setRelayWarningDialog(prev => ({ ...prev, open: false }));
+  };
+
+  const handleNpubSubmit = async () => {
     if (!npubInput.trim()) {
       setError('Please enter npub');
       return;
     }
-    validateAndSubmit(npubInput.trim());
+    await validateAndSubmit(npubInput.trim());
   };
 
   const handleNip07 = async () => {
@@ -133,6 +203,7 @@ export function InputForm({ onSubmit, onLoadCachedResult, isLoading, progress }:
 
   const handleFetchRelays = async () => {
     setError(null);
+    setUnreachableRelaysMessage(null);
     const input = npubInput.trim();
     if (!input) {
       setError('Please enter npub first');
@@ -148,11 +219,27 @@ export function InputForm({ onSubmit, onLoadCachedResult, isLoading, progress }:
     setIsFetchingRelays(true);
     try {
       // Fetch relay list from multiple sources
-      const relayList = await fetchRelayList(pubkey, [...DEFAULT_RELAYS, ...relays]);
-      if (relayList.length > 0) {
+      const result = await fetchRelayList(pubkey, [...DEFAULT_RELAYS, ...relays]);
+      if (result.reachable.length > 0) {
         // Merge with existing relays, removing duplicates
-        const uniqueRelays = Array.from(new Set([...relayList, ...relays]));
+        const uniqueRelays = Array.from(new Set([...result.reachable, ...relays]));
         setRelays(uniqueRelays);
+        
+        // Show message about unreachable relays
+        if (result.unreachable.length > 0) {
+          const relayNames = result.unreachable.map(url => {
+            try {
+              return new URL(url).host;
+            } catch {
+              return url;
+            }
+          });
+          setUnreachableRelaysMessage(
+            `${result.unreachable.length} relay(s) excluded (unreachable): ${relayNames.join(', ')}`
+          );
+        }
+      } else if (result.unreachable.length > 0) {
+        setError(`No reachable relays found. ${result.unreachable.length} relay(s) were unreachable.`);
       } else {
         setError('No relay list found for this user (NIP-65)');
       }
@@ -340,7 +427,7 @@ export function InputForm({ onSubmit, onLoadCachedResult, isLoading, progress }:
           variant="contained"
           size="large"
           onClick={handleNpubSubmit}
-          disabled={isLoading || !npubInput.trim() || relays.length === 0}
+          disabled={isLoading || isTestingRelays || !npubInput.trim() || relays.length === 0}
           sx={{
             background: 'linear-gradient(45deg, #9c27b0, #ff4081)',
             '&:hover': {
@@ -348,7 +435,7 @@ export function InputForm({ onSubmit, onLoadCachedResult, isLoading, progress }:
             },
           }}
         >
-          Start Analysis
+          {isTestingRelays ? 'Testing Relays...' : 'Start Analysis'}
         </Button>
 
         {hasExtension && (
@@ -365,7 +452,7 @@ export function InputForm({ onSubmit, onLoadCachedResult, isLoading, progress }:
               variant="outlined"
               size="large"
               onClick={handleNip07}
-              disabled={isLoading || relays.length === 0}
+              disabled={isLoading || isTestingRelays || relays.length === 0}
               sx={{
                 borderColor: '#9c27b0',
                 color: '#ba68c8',
@@ -466,6 +553,69 @@ export function InputForm({ onSubmit, onLoadCachedResult, isLoading, progress }:
           />
         </Box>
       )}
+
+      {/* Relay Warning Dialog */}
+      <Dialog
+        open={relayWarningDialog.open}
+        onClose={handleRelayWarningCancel}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <ErrorOutlineIcon color="warning" />
+          Unreachable Relays Detected
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" sx={{ mb: 2 }}>
+            The following {relayWarningDialog.unreachableRelays.length} relay(s) could not be reached and will be excluded from the analysis:
+          </Typography>
+          <List dense sx={{ bgcolor: 'action.hover', borderRadius: 1, mb: 2 }}>
+            {relayWarningDialog.unreachableRelays.map((relay) => (
+              <ListItem key={relay}>
+                <ListItemIcon sx={{ minWidth: 32 }}>
+                  <ErrorOutlineIcon color="error" fontSize="small" />
+                </ListItemIcon>
+                <ListItemText 
+                  primary={relay}
+                  primaryTypographyProps={{ 
+                    variant: 'body2',
+                    sx: { fontFamily: 'monospace', fontSize: '0.85rem' }
+                  }}
+                />
+              </ListItem>
+            ))}
+          </List>
+          <Typography variant="body2" color="text.secondary">
+            {relayWarningDialog.reachableRelays.length} relay(s) will be used for analysis.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleRelayWarningCancel} color="inherit">
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleRelayWarningConfirm} 
+            variant="contained"
+            sx={{
+              background: 'linear-gradient(45deg, #9c27b0, #ff4081)',
+              '&:hover': {
+                background: 'linear-gradient(45deg, #7b1fa2, #c60055)',
+              },
+            }}
+          >
+            Continue with {relayWarningDialog.reachableRelays.length} relay(s)
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Snackbar for NIP-65 unreachable relays */}
+      <Snackbar
+        open={!!unreachableRelaysMessage}
+        autoHideDuration={6000}
+        onClose={() => setUnreachableRelaysMessage(null)}
+        message={unreachableRelaysMessage}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      />
     </Box>
   );
 }

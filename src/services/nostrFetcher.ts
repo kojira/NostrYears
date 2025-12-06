@@ -100,11 +100,45 @@ async function testRelayConnection(relayUrl: string, timeoutMs: number = 3000): 
 }
 
 /**
- * Fetch user's relay list (NIP-65, kind 10002)
- * Returns an array of relay URLs that are marked for read or read/write
- * Only returns relays that pass connection test
+ * Result of relay connection test
  */
-export async function fetchRelayList(pubkey: string, relays: string[] = DEFAULT_RELAYS): Promise<string[]> {
+export interface RelayTestResult {
+  reachable: string[];
+  unreachable: string[];
+}
+
+/**
+ * Test multiple relays for connectivity
+ * Returns reachable and unreachable relay URLs
+ */
+export async function testRelays(relayUrls: string[]): Promise<RelayTestResult> {
+  const testResults = await Promise.all(
+    relayUrls.map(async (url) => ({
+      url,
+      reachable: await testRelayConnection(url),
+    }))
+  );
+
+  return {
+    reachable: testResults.filter((r) => r.reachable).map((r) => r.url),
+    unreachable: testResults.filter((r) => !r.reachable).map((r) => r.url),
+  };
+}
+
+/**
+ * Result of fetching relay list with connection test
+ */
+export interface FetchRelayListResult {
+  reachable: string[];
+  unreachable: string[];
+}
+
+/**
+ * Fetch user's relay list (NIP-65, kind 10002)
+ * Returns reachable and unreachable relay URLs
+ * Only relays that pass connection test are in "reachable"
+ */
+export async function fetchRelayList(pubkey: string, relays: string[] = DEFAULT_RELAYS): Promise<FetchRelayListResult> {
   const f = initFetcher();
   
   try {
@@ -133,20 +167,23 @@ export async function fetchRelayList(pubkey: string, relays: string[] = DEFAULT_
         }))
       );
       
-      // Return only reachable relays
-      const reachableRelays = testResults
+      const reachable = testResults
         .filter((r) => r.reachable)
         .map((r) => r.url);
       
-      console.log(`Relay test: ${reachableRelays.length}/${relayUrls.length} relays reachable`);
+      const unreachable = testResults
+        .filter((r) => !r.reachable)
+        .map((r) => r.url);
       
-      return reachableRelays;
+      console.log(`Relay test: ${reachable.length}/${relayUrls.length} relays reachable`);
+      
+      return { reachable, unreachable };
     }
   } catch (error) {
     console.error('Error fetching relay list:', error);
   }
   
-  return [];
+  return { reachable: [], unreachable: [] };
 }
 
 /**

@@ -65,11 +65,11 @@ export function createEventContent(stats: NostrYearsStats): NostrYearsEventConte
 /**
  * Publish NostrYears stats to relays using NIP-07
  * Also publishes a kind 1 note with the summary text
+ * Uses stats.relays (relays used during analysis) for publishing
  */
 export async function publishNostrYearsStats(
   stats: NostrYearsStats,
-  summaryText: string,
-  relays: string[] = DEFAULT_RELAYS
+  summaryText: string
 ): Promise<boolean> {
   if (!hasNip07()) {
     console.error('NIP-07 extension not available');
@@ -79,9 +79,12 @@ export async function publishNostrYearsStats(
   const content = createEventContent(stats);
   const dTag = generateDTag(NOSTR_YEARS_VERSION, stats.period.since, stats.period.until, stats.relays);
   
+  // Use relays from stats (already tested during analysis)
+  const relays = stats.relays;
+  
   console.log('Publishing with d-tag:', dTag);
   console.log('Period:', stats.period.since, '-', stats.period.until);
-  console.log('Relays:', stats.relays);
+  console.log('Relays:', relays);
   
   // Kind 30078 event (stats data)
   const statsEvent: UnsignedEvent = {
@@ -110,7 +113,7 @@ export async function publishNostrYearsStats(
     const signedStatsEvent = await window.nostr!.signEvent(statsEvent);
     const signedNoteEvent = await window.nostr!.signEvent(noteEvent);
     
-    // Publish to relays
+    // Publish to relays (from stats, already tested during analysis)
     const publishPromises = relays.map(async (relayUrl) => {
       try {
         const relay = await Relay.connect(relayUrl);
