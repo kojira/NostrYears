@@ -52,7 +52,9 @@ let fetcher: NostrFetcher | null = null;
  */
 export function initFetcher(): NostrFetcher {
   if (!fetcher) {
-    fetcher = NostrFetcher.init();
+    fetcher = NostrFetcher.init({
+      minLogLevel: 'warn',
+    });
   }
   return fetcher;
 }
