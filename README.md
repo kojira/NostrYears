@@ -1,5 +1,7 @@
 # NostrYears
 
+🔗 **Live:** https://kojira.github.io/NostrYears/
+
 2025年のNostr活動を振り返るWebアプリケーション。
 
 ## 機能
